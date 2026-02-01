@@ -21,5 +21,8 @@
     "noEmit": true
   },
   "include": ["./**/*"],
-  "exclude": ["./_generated"]
+  "exclude": ["./_generated"],
+  "paths": {
+  "@/*": ["./src/*"]
+}
 }
