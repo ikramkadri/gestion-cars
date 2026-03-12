@@ -2,7 +2,7 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
- * جلب بيانات الفاتورة الرسمية بناءً على رقم الفاتورة أو معرف العملية
+ * جلب بيانات الفاتورة الرسمية
  */
 export const getInvoiceData = query({
   args: { saleId: v.id("sales") },
@@ -13,7 +13,6 @@ export const getInvoiceData = query({
     const sale = await ctx.db.get(args.saleId);
     if (!sale) throw new Error("سجل البيع غير موجود");
 
-    // جلب البيانات المرتبطة بالتوازي لتحقيق أقصى سرعة
     const [car, customer, seller] = await Promise.all([
       ctx.db.get(sale.carId),
       ctx.db.get(sale.customerId),
@@ -21,7 +20,7 @@ export const getInvoiceData = query({
     ]);
 
     return {
-      invoiceNumber: sale.invoiceNumber, // استخدام الرقم التسلسلي الاحترافي
+      invoiceNumber: sale.invoiceNumber,
       date: sale.saleDate,
       amount: sale.amountPaid,
       paymentMethod: sale.paymentMethod,

@@ -9,8 +9,8 @@
  */
 
 import type * as cars from "../cars.js";
+import type * as invoices from "../invoices.js";
 import type * as sales from "../sales.js";
-import type * as seed from "../seed.js";
 import type * as statistics from "../statistics.js";
 
 import type {
@@ -21,8 +21,8 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   cars: typeof cars;
+  invoices: typeof invoices;
   sales: typeof sales;
-  seed: typeof seed;
   statistics: typeof statistics;
 }>;
 

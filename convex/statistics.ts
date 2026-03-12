@@ -65,7 +65,7 @@ export const getDashboardStats = query({
     return {
       inventory: {
         available: availableCars.length,
-        sold: soldCars.length, // تم التعديل هنا ليكون متوافقاً مع حالة السيارات (Consistent)
+        sold: soldCars.length, 
         total: allActiveCars.length,
       },
       financials: {
