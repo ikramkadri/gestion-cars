@@ -9,9 +9,12 @@
  */
 
 import type * as cars from "../cars.js";
+<<<<<<< HEAD
 import type * as invoices from "../invoices.js";
 import type * as sales from "../sales.js";
 import type * as statistics from "../statistics.js";
+=======
+>>>>>>> d382507ea572d6a84bf6ab6305ac892fd0269226
 
 import type {
   ApiFromModules,
@@ -21,9 +24,12 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   cars: typeof cars;
+<<<<<<< HEAD
   invoices: typeof invoices;
   sales: typeof sales;
   statistics: typeof statistics;
+=======
+>>>>>>> d382507ea572d6a84bf6ab6305ac892fd0269226
 }>;
 
 /**

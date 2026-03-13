@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 
 function App() {
@@ -23,6 +24,14 @@ function App() {
         </ul>
       </div>
     </div>
+=======
+import LoginPage from "./pages/Login";
+
+function App() {
+  return (
+    // درك رانا نقولو للمتصفح: "أظهر صفحة اللوڨين مباشرة"
+    <LoginPage />
+>>>>>>> d382507ea572d6a84bf6ab6305ac892fd0269226
   );
 }
 
