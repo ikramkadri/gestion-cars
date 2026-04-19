@@ -1,10 +1,16 @@
+/**
+ * المسار: convex/users.ts
+ * الوظيفة: مزامنة مستخدمي Clerk مع قاعدة البيانات وإدارة صلاحياتهم.
+ */
+
 import { mutation, query } from "./_generated/server";
+// تمت إزالة استيراد v من هنا أيضاً لإزالة خطأ Defined but never used
 
 export const storeUser = mutation({
-  args: {}, 
+  args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("غير مصرح: يجب تسجيل الدخول عبر Clerk");
+    if (!identity) throw new Error("Unauthorized: Clerk login required");
 
     const user = await ctx.db
       .query("users")
@@ -12,10 +18,8 @@ export const storeUser = mutation({
       .unique();
 
     const now = Date.now();
-    
-    // حل مشكلة النوع وتعدد الحقول في Clerk
     const email = (identity.emailAddress ?? identity.email ?? "no-email@provided.com") as string;
-    const name = (identity.name ?? identity.nickname ?? "مستخدم جديد") as string;
+    const name = (identity.name ?? identity.nickname ?? "User") as string;
 
     if (user !== null) {
       await ctx.db.patch(user._id, { 

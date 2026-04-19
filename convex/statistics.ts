@@ -1,85 +1,92 @@
+/**
+ * المسار: convex/statistics.ts
+ * الوظيفة: تزويد لوحة التحكم بالأرقام المالية، حالة المخزون، وبيانات الرسم البياني للمبيعات الشهرية.
+ */
+
 import { query } from "./_generated/server";
 
-/**
- * دالة الإحصائيات المتقدمة - نسخة التقارير الشهرية وتحليل الأداء
- */
 export const getDashboardStats = query({
-  args: {}, 
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
+    // 1. جلب السيارات المتاحة والمباعة باستخدام الفهارس (للأداء العالي)
+    const availableCars = await ctx.db
+      .query("cars")
+      .withIndex("by_status_archived", (q) => 
+        q.eq("status", "Available").eq("isArchived", false)
+      )
+      .collect();
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
-      .unique();
+    const soldCars = await ctx.db
+      .query("cars")
+      .withIndex("by_status_archived", (q) => 
+        q.eq("status", "Sold").eq("isArchived", false)
+      )
+      .collect();
 
-    if (!user) return null;
+    // 2. جلب جميع عمليات البيع
+    const allSales = await ctx.db.query("sales").collect();
 
-    // جلب البيانات الأساسية
-    const [availableCars, soldCars, allSales] = await Promise.all([
-      ctx.db.query("cars").withIndex("by_status", (q) => q.eq("status", "Available").eq("isArchived", false)).collect(),
-      ctx.db.query("cars").withIndex("by_status", (q) => q.eq("status", "Sold").eq("isArchived", false)).collect(),
-      ctx.db.query("sales").collect()
-    ]);
-
-    if (user.role === "viewer") {
-      return { inventory: { available: availableCars.length, sold: soldCars.length } }; 
-    }
-
-    const carsMap = new Map([...availableCars, ...soldCars].map((c) => [c._id, c]));
+    // 3. الحسابات المالية الأساسية
+    const totalRevenue = allSales.reduce((sum, s) => sum + (s.amountPaid || 0), 0);
     
-    let totalRevenue = 0;
+    // جلب بيانات السيارات المرتبطة بالمبيعات لحساب الأرباح
+    const soldCarIds = allSales.map(s => s.carId);
+    const soldCarsData = await Promise.all(
+      soldCarIds.map(id => ctx.db.get(id))
+    );
+    
     let totalProfit = 0;
-    const paymentMethods: Record<string, number> = {};
-    
-    // إحصائيات شهرية (Monthly Reports)
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    let salesThisMonth = 0;
-    let revenueThisMonth = 0;
-
-    allSales.forEach((sale) => {
-      const saleDate = new Date(sale.saleDate);
-      
-      // حساب إجمالي الإيرادات وطرق الدفع
-      totalRevenue += sale.amountPaid;
-      paymentMethods[sale.paymentMethod] = (paymentMethods[sale.paymentMethod] || 0) + 1;
-      
-      // حساب الأرباح الصافية
-      const car = carsMap.get(sale.carId);
-      if (car) {
+    allSales.forEach((sale, index) => {
+      const car = soldCarsData[index];
+      if (car && typeof car.purchasePrice === "number") {
         totalProfit += (sale.amountPaid - car.purchasePrice);
-      }
-
-      // فلترة مبيعات الشهر الحالي للتقارير
-      if (saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear) {
-        salesThisMonth++;
-        revenueThisMonth += sale.amountPaid;
       }
     });
 
+    const stockValue = availableCars.reduce((sum, c) => sum + (c.purchasePrice || 0), 0);
+
+    // 4. إعداد بيانات الرسم البياني (المبيعات الشهرية)
+    // سنقوم بإنشاء خريطة (Map) لتجميع المبيعات حسب "السنة-الشهر"
+    const monthlyDataMap = new Map<string, { month: string; revenue: number; count: number }>();
+
+    // أسماء الأشهر بالعربية للعرض
+    const monthNames = [
+      "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+      "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+    ];
+
+    allSales.forEach((sale) => {
+      const date = new Date(sale.saleDate || sale._creationTime);
+      const monthIndex = date.getMonth();
+      const year = date.getFullYear();
+      const key = `${year}-${monthIndex}`; // مفتاح فريد للشهر والسنة
+
+      const existing = monthlyDataMap.get(key) || { 
+        month: `${monthNames[monthIndex]} ${year}`, 
+        revenue: 0, 
+        count: 0 
+      };
+
+      existing.revenue += (sale.amountPaid || 0);
+      existing.count += 1;
+      monthlyDataMap.set(key, existing);
+    });
+
+    // تحويل الخريطة إلى مصفوفة مرتبة زمنياً لعرضها في الرسم البياني
+    const chartData = Array.from(monthlyDataMap.values()).slice(-6); // آخر 6 أشهر فقط
+
     return {
-      inventory: {
-        available: availableCars.length,
-        sold: soldCars.length,
-        total: availableCars.length + soldCars.length,
+      inventory: { 
+        available: availableCars.length, 
+        sold: soldCars.length, 
+        total: availableCars.length + soldCars.length 
       },
-      financials: {
-        totalRevenue,
-        totalProfit,
-        stockValue: availableCars.reduce((sum, c) => sum + c.purchasePrice, 0),
-        paymentStats: paymentMethods
+      financials: { 
+        totalRevenue, 
+        totalProfit, 
+        stockValue 
       },
-      monthlyReport: {
-        month: currentMonth + 1,
-        year: currentYear,
-        salesCount: salesThisMonth,
-        revenue: revenueThisMonth
-      },
-      updatedAt: Date.now()
+      chartData, // هذه البيانات تذهب مباشرة للرسم البياني
+      lastUpdate: Date.now()
     };
   },
 });

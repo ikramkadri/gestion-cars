@@ -1,25 +1,18 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import "./index.css";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+// src/main.tsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { ConvexReactClient } from "convex/react";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
+import App from './App';
+import './index.css';
 
-// تعريف الواجهة لـ Vite ليفهم وجود env بدون استخدام any
-interface ImportMetaEnv {
-  readonly VITE_CONVEX_URL: string;
-}
+// تكوين Convex Client
+const convex = new ConvexReactClient(import.meta.env.VITE_CONVEX_URL as string);
 
-interface ImportMeta {
-  readonly env: ImportMetaEnv;
-}
-
-// الآن نستخدم الرابط بشكل طبيعي وسيختفي الخطأ والتنبيه
-const convex = new ConvexReactClient((import.meta as unknown as ImportMeta).env.VITE_CONVEX_URL);
-
-ReactDOM.createRoot(document.getElementById("root")!).render(
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ConvexProvider client={convex}>
+    <ConvexAuthProvider client={convex}>
       <App />
-    </ConvexProvider>
+    </ConvexAuthProvider>
   </React.StrictMode>
 );

@@ -1,43 +1,65 @@
+/**
+ * المسار: convex/cars.ts
+ * الوظيفة: تحديث دوال الإضافة والتعديل لتشمل الحقول الجديدة (location, hasWarranty, cylinders).
+ */
+
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-/**
- * إضافة سيارة جديدة مع تفعيل إشعار النظام (Dashboard Notification)
- */
+export const generateUploadUrl = mutation({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("غير مصرح");
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
 export const addCar = mutation({
   args: {
-    make: v.string(), 
-    model: v.string(), 
-    year: v.number(), 
-    images: v.array(v.string()), 
-    mainImage: v.string(), 
-    purchasePrice: v.number(), 
-    price: v.number(), 
+    make: v.string(),
+    model: v.string(),
+    origin: v.optional(v.string()),
+    year: v.number(),
+    images: v.array(v.string()),
+    mainImage: v.string(),
+    purchasePrice: v.number(),
+    price: v.number(),
     mileage: v.number(),
+    location: v.string(), // جديد
+    hasWarranty: v.boolean(), // جديد
+    cylinders: v.optional(v.number()), // جديد
+    fuel: v.union(v.literal("Gasoline"), v.literal("Diesel"), v.literal("Electric"), v.literal("Hybrid")),
+    transmission: v.union(v.literal("Automatic"), v.literal("Manual")),
+    drivetrain: v.union(v.literal("FWD"), v.literal("RWD"), v.literal("AWD"), v.literal("4WD")),
+    engineSize: v.optional(v.string()),
+    color: v.optional(v.string()),
     condition: v.union(v.literal("Excellent"), v.literal("Good"), v.literal("Fair"), v.literal("Poor")),
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("غير مصرح");
-
-    const user = await ctx.db.query("users").withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject)).unique();
+    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+    
     if (!user || user.role === "viewer") throw new Error("لا تملك صلاحية الإضافة");
 
     const now = Date.now();
     const carId = await ctx.db.insert("cars", {
-      ...args, 
-      status: "Available", 
-      isArchived: false, 
-      createdAt: now, 
+      ...args,
+      status: "Available",
+      isArchived: false,
+      createdAt: now,
       updatedAt: now,
     });
 
-    // تسجيل إشعار في الجدول الجديد
     await ctx.db.insert("notifications", {
-      title: "مخزون جديد 🚗",
-      message: `تم إضافة ${args.make} ${args.model} للمخزن بنجاح`,
-      type: "info",
+      title: "إضافة سيارة جديدة 🚗",
+      message: `تمت إضافة ${args.make} ${args.model} في ${args.location} بنجاح.`,
+      type: "success",
       isRead: false,
       createdAt: now,
     });
@@ -46,97 +68,105 @@ export const addCar = mutation({
   },
 });
 
-/**
- * جلب السيارات مع الفلترة المتقدمة
- */
 export const getCars = query({
-  args: {
-    make: v.optional(v.string()),
-    status: v.optional(v.string()),
+  args: { 
+    includeArchived: v.optional(v.boolean()),
+    status: v.optional(v.union(v.literal("Available"), v.literal("Sold")))
   },
   handler: async (ctx, args) => {
-    // تم تغيير let إلى const هنا لحل مشكلة التنبيه (Linter error)
-    const carsQuery = ctx.db.query("cars").filter((q) => q.eq(q.field("isArchived"), false));
-    
-    const allCars = await carsQuery.order("desc").collect();
+    let carsQuery;
+    if (args.status) {
+      carsQuery = ctx.db.query("cars")
+        .withIndex("by_status_archived", (q) => 
+          q.eq("status", args.status!).eq("isArchived", args.includeArchived ?? false)
+        );
+    } else {
+      carsQuery = ctx.db.query("cars")
+        .withIndex("by_archived", (q) => 
+          q.eq("isArchived", args.includeArchived ?? false)
+        );
+    }
 
-    return allCars.filter((car) => {
-      const matchMake = args.make ? car.make.toLowerCase().includes(args.make.toLowerCase()) : true;
-      const matchStatus = args.status ? car.status === args.status : true;
-      return matchMake && matchStatus;
-    });
+    const results = await carsQuery.order("desc").collect();
+
+    return await Promise.all(
+      results.map(async (car) => ({
+        ...car,
+        mainImage: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : null,
+        images: await Promise.all(
+          car.images.map(async (id) => await ctx.storage.getUrl(id))
+        ),
+      }))
+    );
   },
 });
 
-/**
- * تحديث بيانات السيارة (مع التحقق من الرتبة)
- */
+export const getCarById = query({
+  args: { carId: v.id("cars") },
+  handler: async (ctx, args) => {
+    const car = await ctx.db.get(args.carId);
+    if (!car) return null;
+    return {
+      ...car,
+      mainImage: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : null,
+      images: await Promise.all(
+        car.images.map(async (id) => await ctx.storage.getUrl(id))
+      ),
+    };
+  },
+});
+
 export const updateCar = mutation({
   args: {
     carId: v.id("cars"),
     updates: v.object({
-      price: v.optional(v.number()),
-      status: v.optional(v.union(v.literal("Available"), v.literal("Sold"))),
-      condition: v.optional(v.union(v.literal("Excellent"), v.literal("Good"), v.literal("Fair"), v.literal("Poor"))),
+      make: v.optional(v.string()),
+      model: v.optional(v.string()),
+      origin: v.optional(v.string()),
+      year: v.optional(v.number()),
       description: v.optional(v.string()),
+      images: v.optional(v.array(v.string())),
+      mainImage: v.optional(v.string()),
+      price: v.optional(v.number()),
+      mileage: v.optional(v.number()),
+      location: v.optional(v.string()), // جديد
+      hasWarranty: v.optional(v.boolean()), // جديد
+      cylinders: v.optional(v.number()), // جديد
+      status: v.optional(v.union(v.literal("Available"), v.literal("Sold"))),
+      isArchived: v.optional(v.boolean()),
     }),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("غير مصرح");
 
-    const user = await ctx.db.query("users").withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject)).unique();
-    if (!user || user.role === "viewer") throw new Error("لا تملك صلاحية التعديل");
-    
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
+      .unique();
+
+    if (!user || user.role === "viewer") {
+      throw new Error("لا تملك صلاحية تعديل البيانات");
+    }
+
     await ctx.db.patch(args.carId, {
       ...args.updates,
       updatedAt: Date.now(),
     });
+
+    return args.carId;
   },
 });
 
-/**
- * أرشفة السيارة (Soft Delete)
- */
 export const archiveCar = mutation({
   args: { carId: v.id("cars") },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("غير مصرح");
 
-    const user = await ctx.db.query("users").withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject)).unique();
-    if (!user || user.role === "viewer") throw new Error("لا تملك صلاحية الأرشفة");
-
     await ctx.db.patch(args.carId, {
       isArchived: true,
-      updatedAt: Date.now(),
+      archivedAt: Date.now(),
     });
-  },
-});
-
-/**
- * جلب الإشعارات غير المقروءة
- */
-export const getNotifications = query({
-  handler: async (ctx) => {
-    return await ctx.db.query("notifications")
-      .withIndex("by_read_status", (q) => q.eq("isRead", false))
-      .order("desc")
-      .collect();
-  },
-});
-
-/**
- * تحديد الإشعارات كمقروءة
- */
-export const markNotificationsRead = mutation({
-  handler: async (ctx) => {
-    const unread = await ctx.db.query("notifications")
-      .withIndex("by_read_status", (q) => q.eq("isRead", false))
-      .collect();
-    
-    for (const n of unread) {
-      await ctx.db.patch(n._id, { isRead: true });
-    }
   },
 });

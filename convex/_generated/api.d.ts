@@ -8,13 +8,18 @@
  * @module
  */
 
+import type * as activity_logs from "../activity_logs.js";
+import type * as auth from "../auth.js";
+import type * as bookings from "../bookings.js";
 import type * as cars from "../cars.js";
-<<<<<<< HEAD
+import type * as favorites from "../favorites.js";
+import type * as files from "../files.js";
 import type * as invoices from "../invoices.js";
+import type * as notifications from "../notifications.js";
 import type * as sales from "../sales.js";
+import type * as site_settings from "../site_settings.js";
 import type * as statistics from "../statistics.js";
-=======
->>>>>>> d382507ea572d6a84bf6ab6305ac892fd0269226
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -23,13 +28,18 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  activity_logs: typeof activity_logs;
+  auth: typeof auth;
+  bookings: typeof bookings;
   cars: typeof cars;
-<<<<<<< HEAD
+  favorites: typeof favorites;
+  files: typeof files;
   invoices: typeof invoices;
+  notifications: typeof notifications;
   sales: typeof sales;
+  site_settings: typeof site_settings;
   statistics: typeof statistics;
-=======
->>>>>>> d382507ea572d6a84bf6ab6305ac892fd0269226
+  users: typeof users;
 }>;
 
 /**
