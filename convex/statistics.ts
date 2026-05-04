@@ -22,6 +22,12 @@ export const getDashboardStats = query({
       )
       .collect();
 
+    // جلب الحجوزات النشطة لحساب السيارات المحجوزة
+    const pendingBookings = await ctx.db
+      .query("bookings")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+
     // 2. جلب جميع عمليات البيع
     const allSales = await ctx.db.query("sales").collect();
 
@@ -78,7 +84,8 @@ export const getDashboardStats = query({
       inventory: { 
         available: availableCars.length, 
         sold: soldCars.length, 
-        total: availableCars.length + soldCars.length 
+        total: availableCars.length + soldCars.length,
+        reserved: pendingBookings.length
       },
       financials: { 
         totalRevenue, 

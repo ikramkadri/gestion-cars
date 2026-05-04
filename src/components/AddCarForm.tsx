@@ -1,262 +1,468 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Car, 
-  Camera, 
-  Info, 
-  Wrench, 
-  DollarSign, 
-  ChevronLeft, 
-  ChevronRight, 
-  Check, 
-  Upload, 
-  X,
-  AlertCircle
+  Car, MapPin, CheckCircle2, 
+  ChevronLeft, ChevronRight, Image as ImageIcon, 
+  Settings2, DollarSign, Palette,
+  Zap, Info, Trash2, Camera, Plus, MousePointerClick,
+  TrendingUp, TrendingDown, Search, AlertCircle, Pipette
 } from 'lucide-react';
 
-interface Step {
-  id: number;
-  title: string;
-  icon: React.ReactNode;
-}
-
-const steps: Step[] = [
-  { id: 1, title: 'البيانات الأساسية', icon: <Info size={18} /> },
-  { id: 2, title: 'المواصفات الفنية', icon: <Wrench size={18} /> },
-  { id: 3, title: 'الصور والوسائط', icon: <Camera size={18} /> },
-  { id: 4, title: 'التسعير والنشر', icon: <DollarSign size={18} /> },
+// --- الثوابت ---
+const CAR_MAKES = ['Toyota', 'Hyundai', 'Volkswagen', 'Renault', 'Peugeot', 'Dacia', 'Kia', 'Mercedes-Benz', 'BMW', 'Audi', 'Ford', 'Nissan', 'Chevrolet', 'Suzuki', 'Mitsubishi', 'Honda', 'Seat', 'Skoda', 'Fiat'];
+const ORIGINS = ['خليجي', 'كوري', 'أوروبي', 'أمريكي', 'صيني', 'ياباني', 'محلي (الجزائر)'];
+const ALGERIA_STATES = [
+  '01 - أدرار', '02 - الشلف', '03 - الأغواط', '04 - أم البواقي', '05 - باتنة', '06 - بجاية', '07 - بسكرة', '08 - بشار', '09 - البليدة', '10 - البويرة',
+  '11 - تمنراست', '12 - تبسة', '13 - تلمسان', '14 - تيارت', '15 - تيزي وزو', '16 - الجزائر', '17 - الجلفة', '18 - جيجل', '19 - سطيف', '20 - سعيدة',
+  '21 - سكيكدة', '22 - سيدي بلعباس', '23 - عنابة', '24 - قالمة', '25 - قسنطينة', '26 - المدية', '27 - مستغانم', '28 - المسيلة', '29 - معسكر', '30 - ورقلة',
+  '31 - وهران', '32 - البيض', '33 - إليزي', '34 - برج بوعريريج', '35 - بومرداس', '36 - الطارف', '37 - تندوف', '38 - تسمسيلت', '39 - الوادي', '40 - خنشلة',
+  '41 - سوق أهراس', '42 - تيبازة', '43 - ميلة', '44 - عين الدفلى', '45 - النعامة', '46 - عين تموشنت', '47 - غرداية', '48 - غليزان', '49 - تيميمون', '50 - برج باجي مختار',
+  '51 - أولاد جلال', '52 - بني عباس', '53 - عين صالح', '54 - عين قزام', '55 - تقرت', '56 - جانت', '57 - المغير', '58 - المنيعة'
 ];
 
-interface AddCarFormProps {
-  onCancel: () => void;
-}
+const PRESET_COLORS = [
+  { name: 'أبيض', hex: '#FFFFFF', text: 'text-gray-600' },
+  { name: 'أسود', hex: '#000000', text: 'text-white' },
+  { name: 'فضي', hex: '#C0C0C0', text: 'text-gray-800' },
+  { name: 'رمادي', hex: '#808080', text: 'text-white' },
+  { name: 'أحمر', hex: '#FF0000', text: 'text-white' },
+  { name: 'أزرق', hex: '#0000FF', text: 'text-white' },
+  { name: 'بني', hex: '#8B4513', text: 'text-white' },
+  { name: 'ذهبي', hex: '#D4AF37', text: 'text-white' },
+];
 
-export default function AddCarForm({ onCancel }: AddCarFormProps) {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState({
-    brand: '',
-    model: '',
-    year: '',
-    condition: 'new',
-    mileage: '',
-    engine: '',
-    transmission: 'automatic',
-    fuelType: 'gasoline',
-    color: '',
-    price: '',
-    description: '',
-  });
+const CONDITIONS = [
+  { id: 'Excellent', label: 'ممتازة', color: 'bg-green-500', icon: '✨' },
+  { id: 'Good', label: 'جيدة جداً', color: 'bg-blue-500', icon: '👍' },
+  { id: 'Fair', label: 'جيدة', color: 'bg-amber-500', icon: '👌' },
+  { id: 'Poor', label: 'تحتاج إصلاح', color: 'bg-red-500', icon: '🔧' },
+];
 
-  const updateFormData = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+// --- المكونات الفرعية ---
+const AutocompleteInput = ({ label, value, onChange, suggestions, placeholder, icon: Icon }) => {
+  const [show, setShow] = useState(false);
+  const [filtered, setFiltered] = useState([]);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setShow(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    onChange(val);
+    if (val.length > 0) {
+      const matches = suggestions.filter((s) => s.toLowerCase().includes(val.toLowerCase()));
+      setFiltered(matches);
+      setShow(true);
+    } else {
+      setShow(false);
+    }
   };
 
-  const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, 4));
-  const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
-
   return (
-    <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden animate-in fade-in zoom-in duration-300">
-      {/* Header & Steps Indicator - مستوحى من image_22121d.png */}
-      <div className="bg-[#0f172a] p-8 text-center text-white relative">
-        <h2 className="text-2xl font-bold mb-2">إضافة سيارة جديدة</h2>
-        <p className="text-slate-400 text-sm mb-8">أدخل تفاصيل المركبة بدقة ليتم عرضها في صالة العرض فوراً</p>
-        
-        <div className="flex justify-between items-center max-w-2xl mx-auto relative px-4">
-          {/* Progress Line */}
-          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-700 -translate-y-10 z-0" />
-          
-          {steps.map((step) => (
-            <div key={step.id} className="relative z-10 flex flex-col items-center gap-3">
-              <div 
-                className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 shadow-lg ${
-                  currentStep >= step.id 
-                  ? 'bg-indigo-600 text-white scale-110' 
-                  : 'bg-slate-800 text-slate-500'
-                }`}
-              >
-                {currentStep > step.id ? <Check size={20} /> : <span>{step.id}</span>}
-              </div>
-              <span className={`text-xs font-medium transition-colors ${
-                currentStep >= step.id ? 'text-indigo-400' : 'text-slate-500'
-              }`}>
-                {step.title}
-              </span>
-            </div>
+    <div className="space-y-2 relative" ref={wrapperRef}>
+      <label className="text-sm font-bold text-gray-600 mr-2 block text-right">{label}</label>
+      <div className="relative">
+        <input 
+          value={value} 
+          onChange={handleInputChange} 
+          onFocus={() => { if(value.length === 0) { setFiltered(suggestions); setShow(true); } }}
+          className="w-full p-4 pr-12 rounded-2xl border-2 border-transparent focus:border-blue-500 focus:bg-white outline-none bg-white shadow-sm transition-all text-right" 
+          placeholder={placeholder} 
+        />
+        {Icon && <Icon className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300" size={20} />}
+      </div>
+      {show && filtered.length > 0 && (
+        <div className="absolute z-50 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+          {filtered.map((opt, i) => (
+            <button key={i} onClick={() => { onChange(opt); setShow(false); }} className="w-full text-right p-4 hover:bg-blue-50 text-gray-700 font-bold transition-colors border-b border-gray-50 last:border-0">
+              {opt}
+            </button>
           ))}
         </div>
-      </div>
-
-      {/* Form Content */}
-      <div className="p-8 min-h-[400px]">
-        {/* Step 1: Basic Info */}
-        {currentStep === 1 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-left-4">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">الماركة (Brand)</label>
-              <input 
-                type="text" 
-                placeholder="مثلاً: Toyota" 
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                value={formData.brand}
-                onChange={(e) => updateFormData('brand', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">الموديل (Model)</label>
-              <input 
-                type="text" 
-                placeholder="مثلاً: Camry" 
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                value={formData.model}
-                onChange={(e) => updateFormData('model', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">سنة الصنع</label>
-              <select 
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                value={formData.year}
-                onChange={(e) => updateFormData('year', e.target.value)}
-              >
-                <option value="">اختر السنة</option>
-                {[...Array(30)].map((_, i) => (
-                  <option key={i} value={2025 - i}>{2025 - i}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">الحالة</label>
-              <div className="flex gap-2 p-1 bg-slate-50 rounded-xl">
-                <button 
-                  onClick={() => updateFormData('condition', 'new')}
-                  className={`flex-1 py-2 rounded-lg text-sm transition-all ${formData.condition === 'new' ? 'bg-white shadow-sm text-indigo-600 font-bold' : 'text-slate-500'}`}
-                >جديد</button>
-                <button 
-                  onClick={() => updateFormData('condition', 'used')}
-                  className={`flex-1 py-2 rounded-lg text-sm transition-all ${formData.condition === 'used' ? 'bg-white shadow-sm text-indigo-600 font-bold' : 'text-slate-500'}`}
-                >مستعمل</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Tech Specs */}
-        {currentStep === 2 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-left-4">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">نوع المحرك</label>
-              <input 
-                type="text" 
-                placeholder="مثلاً: V6 3.5L" 
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                value={formData.engine}
-                onChange={(e) => updateFormData('engine', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-700">ناقل الحركة</label>
-              <select 
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                value={formData.transmission}
-                onChange={(e) => updateFormData('transmission', e.target.value)}
-              >
-                <option value="automatic">أوتوماتيك</option>
-                <option value="manual">يدوي (عادي)</option>
-              </select>
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-semibold text-slate-700">وصف إضافي للمواصفات</label>
-              <textarea 
-                rows={4}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all resize-none"
-                placeholder="تحدث عن أنظمة السلامة، الرفاهية، الخ..."
-                value={formData.description}
-                onChange={(e) => updateFormData('description', e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Images - مستوحى من Shopify UI */}
-        {currentStep === 3 && (
-          <div className="space-y-6 animate-in slide-in-from-left-4">
-            <div className="border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center hover:border-indigo-400 hover:bg-indigo-50 transition-all group cursor-pointer">
-              <div className="bg-indigo-100 text-indigo-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                <Upload size={32} />
-              </div>
-              <h3 className="text-lg font-bold text-slate-800">اسحب الصور هنا أو اضغط للرفع</h3>
-              <p className="text-slate-500 text-sm mt-2">يمكنك رفع حتى 10 صور عالية الجودة (JPG, PNG)</p>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {/* Placeholder for uploaded images */}
-              <div className="aspect-video bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center text-slate-400 text-xs">معاينة الصورة</div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 4: Pricing */}
-        {currentStep === 4 && (
-          <div className="max-w-md mx-auto space-y-8 animate-in slide-in-from-left-4">
-            <div className="space-y-4">
-              <label className="text-lg font-bold text-slate-800 block text-center">حدد سعر البيع النهائي</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">DZD</span>
-                <input 
-                  type="number" 
-                  className="w-full pl-16 pr-4 py-6 text-3xl font-bold text-indigo-600 bg-indigo-50 border-2 border-indigo-100 rounded-3xl focus:border-indigo-500 outline-none text-center"
-                  placeholder="0.00"
-                  value={formData.price}
-                  onChange={(e) => updateFormData('price', e.target.value)}
-                />
-              </div>
-            </div>
-            
-            <div className="bg-amber-50 p-4 rounded-2xl flex gap-3 border border-amber-100 text-amber-800 text-sm">
-              <AlertCircle className="shrink-0" size={20} />
-              <p>بمجرد الضغط على "نشر السيارة"، سيتم إدراجها في صالة العرض العامة وتنبيه العملاء المهتمين.</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Footer Actions */}
-      <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
-        <button 
-          onClick={onCancel}
-          className="text-slate-500 font-medium px-6 py-2 hover:text-slate-800 transition-colors"
-        >
-          إلغاء العملية
-        </button>
-
-        <div className="flex gap-3">
-          {currentStep > 1 && (
-            <button 
-              onClick={prevStep}
-              className="px-6 py-3 rounded-xl border border-slate-200 text-slate-700 font-bold flex items-center gap-2 hover:bg-white transition-all"
-            >
-              <ChevronRight size={18} />
-              السابق
-            </button>
-          )}
-          
-          {currentStep < 4 ? (
-            <button 
-              onClick={nextStep}
-              className="px-8 py-3 rounded-xl bg-indigo-600 text-white font-bold flex items-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95"
-            >
-              المتابعة
-              <ChevronLeft size={18} />
-            </button>
-          ) : (
-            <button 
-              className="px-10 py-3 rounded-xl bg-emerald-600 text-white font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all active:scale-95"
-            >
-              نشر السيارة الآن
-              <Check size={18} />
-            </button>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
-}
+};
+
+const AddCarForm = () => {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [images, setImages] = useState([]);
+  const [tempColor, setTempColor] = useState('#FFFFFF');
+  const [isColorConfirmed, setIsColorConfirmed] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [formData, setFormData] = useState({
+    make: '',
+    model: '',
+    origin: '',
+    year: new Date().getFullYear(),
+    description: '',
+    purchasePrice: 0,
+    price: 0,
+    mileage: 0,
+    location: '',
+    color: '#FFFFFF',
+    condition: 'Excellent'
+  });
+
+  const [completedSteps, setCompletedSteps] = useState([]);
+
+  useEffect(() => {
+    const newCompleted = [];
+    if (formData.make && formData.model && formData.year) newCompleted.push(1);
+    if (isColorConfirmed && formData.condition) newCompleted.push(2);
+    if (formData.price > 0 && formData.location) newCompleted.push(3);
+    if (images.length > 0) newCompleted.push(4);
+    setCompletedSteps(newCompleted);
+  }, [formData, images, isColorConfirmed]);
+
+  const nextStep = () => {
+    // التحقق من الخطوة الحالية قبل الانتقال
+    const newErrors: Record<string, string> = {};
+    
+    if (currentStep === 1) {
+      if (!formData.make) newErrors.make = "يرجى اختيار الماركة";
+      if (!formData.model) newErrors.model = "يرجى كتابة الموديل";
+      if (formData.year < 1900 || formData.year > 2026) newErrors.year = "سنة الصنع غير منطقية";
+    } else if (currentStep === 2) {
+      if (!isColorConfirmed) newErrors.color = "يجب تأكيد اللون المختار أولاً";
+    } else if (currentStep === 3) {
+      if (formData.price <= 0) newErrors.price = "سعر البيع يجب أن يكون أكبر من 0";
+      if (!formData.location) newErrors.location = "يرجى تحديد موقع السيارة";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setErrors({});
+    setCurrentStep(prev => prev + 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const prevStep = () => {
+    setCurrentStep(prev => prev - 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const profit = formData.price - formData.purchasePrice;
+  const isLoss = profit < 0;
+
+  return (
+    <div className="max-w-4xl mx-auto p-4 md:p-8 bg-white min-h-screen rtl font-sans" dir="rtl">
+      {/* Header */}
+      <div className="mb-10 text-right flex justify-between items-end">
+        <div>
+           <h1 className="text-3xl font-black text-gray-900 mb-2">إضافة سيارة للمخزون</h1>
+           <p className="text-gray-500 font-medium">أكمل البيانات لإدراج السيارة في نظام الجرد الذكي</p>
+        </div>
+        <div className="hidden md:block">
+            <div className="bg-slate-100 p-2 rounded-2xl flex items-center gap-2">
+                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-blue-600">
+                    <Settings2 size={20} />
+                </div>
+                <span className="text-xs font-black px-2">v2.5.0</span>
+            </div>
+        </div>
+      </div>
+
+      {/* Stepper */}
+      <div className="flex items-center justify-between mb-12 relative px-4">
+        <div className="absolute top-7 left-0 w-full h-0.5 bg-gray-100 -z-10" />
+        {['الأساسيات', 'المواصفات', 'المالية', 'الصور'].map((title, i) => (
+          <div key={i} className="flex flex-col items-center gap-3">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 border-4 ${
+              currentStep === i + 1 ? 'bg-blue-600 border-blue-100 text-white shadow-xl scale-110' :
+              completedSteps.includes(i + 1) ? 'bg-emerald-500 border-emerald-50 text-white' : 'bg-white border-gray-100 text-gray-300'
+            }`}>
+              {completedSteps.includes(i + 1) && currentStep !== i + 1 ? <CheckCircle2 size={24} /> : (i + 1)}
+            </div>
+            <span className={`text-[11px] font-bold ${currentStep === i + 1 ? 'text-blue-600' : 'text-gray-400'}`}>{title}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Main Form Area */}
+      <div className="bg-gray-50/50 p-6 md:p-10 rounded-[3rem] border border-gray-100 shadow-inner min-h-[500px]">
+        
+        {/* Step 1: Basics */}
+        {currentStep === 1 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+            <h2 className="text-xl font-bold flex items-center gap-2 mb-6 text-blue-600"><Car /> المعلومات الأساسية</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <AutocompleteInput 
+                label="الماركة" 
+                value={formData.make} 
+                onChange={(val) => setFormData({...formData, make: val})} 
+                suggestions={CAR_MAKES} 
+                placeholder="ابحث عن الماركة..." 
+                icon={Search}
+              />
+              {errors.make && <p className="text-red-500 text-xs font-bold mt-1 mr-2">{errors.make}</p>}
+              
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-gray-600 mr-2 block text-right">الموديل</label>
+                <input 
+                  value={formData.model} 
+                  onChange={(e) => setFormData({...formData, model: e.target.value})} 
+                  className={`w-full p-4 rounded-2xl border-2 ${errors.model ? 'border-red-500' : 'border-transparent'} focus:border-blue-500 focus:bg-white outline-none bg-white shadow-sm transition-all text-right`} 
+                  placeholder="مثال: Camry, Golf..." 
+                />
+                {errors.model && <p className="text-red-500 text-xs font-bold mt-1 mr-2">{errors.model}</p>}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-600 mr-2 block text-right">سنة الصنع</label>
+                  <input type="number" value={formData.year} onChange={(e) => setFormData({...formData, year: Number(e.target.value)})} className="w-full p-4 rounded-2xl bg-white shadow-sm border-none text-center font-bold" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-600 mr-2 block text-right">كم مقطوع (KM)</label>
+                  <input type="number" value={formData.mileage} onChange={(e) => setFormData({...formData, mileage: Number(e.target.value)})} className="w-full p-4 rounded-2xl bg-white shadow-sm border-none text-center font-bold" />
+                </div>
+              </div>
+              <AutocompleteInput 
+                label="المنشأ / الوارد" 
+                value={formData.origin} 
+                onChange={(val) => setFormData({...formData, origin: val})} 
+                suggestions={ORIGINS} 
+                placeholder="اختر المنشأ..." 
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Specifications & Free Color Picker */}
+        {currentStep === 2 && (
+          <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
+            <div>
+              <label className="text-md font-black text-gray-800 flex items-center gap-2 mb-6"><Info className="text-blue-500" /> حالة السيارة</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {CONDITIONS.map((cond) => (
+                  <button key={cond.id} onClick={() => setFormData({...formData, condition: cond.id})} className={`p-4 rounded-3xl flex flex-col items-center gap-3 transition-all border-4 ${formData.condition === cond.id ? 'border-blue-500 bg-white shadow-xl scale-105' : 'border-transparent bg-white/50 opacity-60'}`}>
+                    <span className="text-3xl">{cond.icon}</span>
+                    <span className="font-black text-xs text-gray-800">{cond.label}</span>
+                    <div className={`w-full h-2 rounded-full ${cond.color}`} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm space-y-8">
+              <div className="flex items-center justify-between">
+                <label className="text-md font-black text-gray-800 flex items-center gap-2"><Palette className="text-pink-500" /> لون الهيكل</label>
+                <div className="flex items-center gap-2 text-xs font-black text-gray-400 bg-gray-50 px-3 py-1 rounded-full">
+                    <Pipette size={14} />
+                    <span>اختر لوناً مخصصاً أو من القائمة</span>
+                </div>
+              </div>
+
+              {/* القائمة السريعة */}
+              <div className="flex flex-wrap gap-3 justify-center">
+                {PRESET_COLORS.map(color => (
+                  <button 
+                    key={color.hex} 
+                    onClick={() => { setTempColor(color.hex); setIsColorConfirmed(false); }} 
+                    className={`w-12 h-12 rounded-2xl border-4 transition-all flex items-center justify-center ${tempColor.toUpperCase() === color.hex ? 'border-blue-500 scale-110 shadow-lg' : 'border-white'}`} 
+                    style={{ backgroundColor: color.hex }}
+                  >
+                    {tempColor.toUpperCase() === color.hex && <CheckCircle2 className={color.text} size={20} />}
+                  </button>
+                ))}
+              </div>
+
+              {/* منتقي الألوان الحر والنتيجة */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center pt-8 border-t border-gray-50">
+                <div className="space-y-4">
+                    <label className="text-xs font-black text-gray-400 block">أداة اختيار اللون الحر:</label>
+                    <div className="flex items-center gap-4 bg-gray-50 p-6 rounded-[2rem] border-2 border-dashed border-gray-200 group hover:border-blue-200 transition-all">
+                        <div className="relative w-20 h-20 shrink-0">
+                            <input 
+                                type="color" 
+                                value={tempColor} 
+                                onChange={(e) => { setTempColor(e.target.value); setIsColorConfirmed(false); }}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                            />
+                            <div 
+                                className="w-full h-full rounded-2xl shadow-xl border-4 border-white transition-transform group-hover:scale-110" 
+                                style={{ backgroundColor: tempColor }} 
+                            />
+                            <div className="absolute -bottom-2 -right-2 bg-white p-1.5 rounded-lg shadow-md">
+                                <MousePointerClick size={14} className="text-blue-600" />
+                            </div>
+                        </div>
+                        <div className="flex-1 space-y-1">
+                            <div className="text-sm font-black text-gray-700">اضغط على المربع للاختيار</div>
+                            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{tempColor}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <label className="text-xs font-black text-gray-400 block">اللون المعتمد حالياً:</label>
+                    <div className="flex flex-col gap-4">
+                       <div className="flex items-center gap-4">
+                          <div className={`w-16 h-16 rounded-[1.5rem] border-4 shadow-lg transition-all duration-500 ${isColorConfirmed ? 'border-emerald-500 scale-105' : 'border-white'}`} style={{ backgroundColor: tempColor }} />
+                          <div className="flex-1">
+                             <input 
+                                 type="text" 
+                                 value={tempColor.toUpperCase()} 
+                                 onChange={(e) => { setTempColor(e.target.value); setIsColorConfirmed(false); }}
+                                 className="w-full bg-transparent font-black text-2xl text-gray-800 outline-none"
+                                 placeholder="#FFFFFF"
+                             />
+                          </div>
+                       </div>
+                       <button 
+                        onClick={() => { setFormData({...formData, color: tempColor}); setIsColorConfirmed(true); }} 
+                        className={`w-full py-5 rounded-2xl font-black transition-all flex items-center justify-center gap-3 ${isColorConfirmed ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-blue-600 text-white shadow-xl shadow-blue-100 hover:-translate-y-1'}`}
+                       >
+                        {isColorConfirmed ? <><CheckCircle2 size={20}/> تم الحفظ بنجاح</> : 'تأكيد هذا اللون'}
+                       </button>
+                    </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Finance */}
+        {currentStep === 3 && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+                <label className="text-xs font-black text-gray-400 mb-3 block">تكلفة الشراء الكلية</label>
+                <div className="flex items-center gap-3">
+                  <input type="number" value={formData.purchasePrice || ''} onChange={(e) => setFormData({...formData, purchasePrice: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent" placeholder="0" />
+                  <span className="font-black text-gray-300">دج</span>
+                </div>
+              </div>
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-blue-100 focus-within:border-blue-500 transition-all">
+                <label className="text-xs font-black text-blue-600 mb-3 block">سعر العرض للبيع</label>
+                <div className="flex items-center gap-3">
+                  <input type="number" value={formData.price || ''} onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent text-blue-700" placeholder="0" />
+                  <span className="font-black text-blue-200">دج</span>
+                </div>
+              </div>
+            </div>
+
+            {(formData.price > 0 && formData.purchasePrice > 0) && (
+              <div className={`p-8 rounded-[3rem] border-4 transition-all duration-500 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative ${isLoss ? 'bg-red-50 border-red-200 text-red-900 shadow-xl shadow-red-100' : 'bg-emerald-50 border-emerald-200 text-emerald-900 shadow-xl shadow-emerald-100'}`}>
+                <div className="flex items-center gap-5 relative z-10">
+                  <div className={`p-5 rounded-2xl shadow-lg ${isLoss ? 'bg-red-600' : 'bg-emerald-600'} text-white animate-bounce`}>
+                    {isLoss ? <TrendingDown size={32} /> : <TrendingUp size={32} />}
+                  </div>
+                  <div>
+                    <h3 className="font-black text-2xl">{isLoss ? 'هناك خسارة!' : 'الربح الصافي متوفر'}</h3>
+                    <p className="text-sm opacity-60 font-bold tracking-wider">تحليل مالي فوري</p>
+                  </div>
+                </div>
+                <div className="text-center md:text-left relative z-10">
+                   <div className="text-4xl font-black tabular-nums">
+                     {Math.abs(profit).toLocaleString()} <small className="text-lg font-bold">دج</small>
+                   </div>
+                </div>
+              </div>
+            )}
+
+            <AutocompleteInput 
+              label="مقر تواجد السيارة" 
+              value={formData.location} 
+              onChange={(val) => setFormData({...formData, location: val})} 
+              suggestions={ALGERIA_STATES} 
+              placeholder="اختر الولاية..." 
+              icon={MapPin}
+            />
+          </div>
+        )}
+
+        {/* Step 4: Images & Description */}
+        {currentStep === 4 && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+             <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-amber-600"><Camera/> ألبوم الصور</h2>
+                <span className="text-xs font-black bg-amber-100 text-amber-700 px-3 py-1 rounded-full">{images.length} صور</span>
+             </div>
+             
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {images.map((_, i) => (
+                <div key={i} className="aspect-square bg-white rounded-3xl relative flex items-center justify-center text-gray-200 border-2 border-gray-100 shadow-sm overflow-hidden group">
+                  <ImageIcon size={48} />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button onClick={() => setImages(images.filter((_, idx) => idx !== i))} className="p-3 bg-red-500 text-white rounded-2xl shadow-xl hover:scale-110 active:scale-95 transition-all">
+                        <Trash2 size={20}/>
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button onClick={() => setImages([...images, 'img'])} className="aspect-square border-4 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all group">
+                <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                    <Plus size={24} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest">إضافة صورة</span>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-sm font-bold text-gray-600 mr-2 block text-right">ملاحظات البائع (الوصف)</label>
+              <textarea 
+                value={formData.description} 
+                onChange={(e) => setFormData({...formData, description: e.target.value})} 
+                rows={4} 
+                className="w-full p-6 rounded-[2.5rem] bg-white shadow-inner outline-none border-2 border-transparent focus:border-blue-100 transition-all text-right resize-none" 
+                placeholder="اذكر حالة المحرك، الدهان، أو أي إضافات أخرى..." 
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Navigation Buttons */}
+      <div className="mt-8 flex items-center justify-between px-4">
+        <button 
+          onClick={prevStep} 
+          disabled={currentStep === 1} 
+          className={`px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-2 ${currentStep === 1 ? 'invisible' : 'bg-white text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+        >
+          <ChevronRight size={20} />
+          السابق
+        </button>
+
+        {currentStep < 4 ? (
+          <button 
+            onClick={nextStep} 
+            className="px-12 py-4 bg-gray-900 text-white rounded-2xl font-black shadow-xl shadow-gray-200 hover:-translate-y-1 active:scale-95 transition-all flex items-center gap-2"
+          >
+            التالي
+            <ChevronLeft size={20} />
+          </button>
+        ) : (
+          <button 
+            disabled={completedSteps.length < 4} 
+            className={`px-14 py-4 rounded-2xl font-black transition-all shadow-xl flex items-center gap-3 ${completedSteps.length === 4 ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 hover:-translate-y-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+          >
+            <Zap size={20}/>
+            حفظ ونشر الإعلان
+          </button>
+        )}
+      </div>
+      
+      {/* Validation Message */}
+      {currentStep === 4 && completedSteps.length < 4 && (
+        <div className="mt-6 flex items-center gap-2 justify-center text-amber-600 bg-amber-50 p-4 rounded-2xl border border-amber-100">
+            <AlertCircle size={18} />
+            <span className="text-xs font-black">يرجى إكمال جميع الخطوات (تأكد من اختيار اللون وتأكيده وصورة واحدة على الأقل)</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AddCarForm;

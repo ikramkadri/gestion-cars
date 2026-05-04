@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 // استخدام الاستيرادات المطلوبة مع العلم أنها قد تسبب خطأ في المعاينة الفورية 
 // ولكنها ضرورية لبيئتك المحلية (Local Environment)
 import { useQuery, useMutation } from "convex/react";
@@ -10,7 +10,6 @@ import {
   DollarSign, 
   Plus, 
   Search, 
-  MoreVertical,
   Clock,
   CheckCircle2,
   Package,
@@ -18,13 +17,19 @@ import {
   Trash2,
   Edit3
 } from 'lucide-react';
+import { Id } from "../../convex/_generated/dataModel";
+import { CarType } from '../features/cars/types/car.types';
 
-/**
- * PATH: src/pages/InventoryPage.tsx
- * تم الاحتفاظ بكافة الاستيرادات الخاصة بـ Convex لضمان عملها عند النسخ إلى مشروعك.
- */
+interface StatCardProps {
+  icon: React.ElementType;
+  color: string;
+  label: string;
+  value: string | number;
+  trend?: string;
+  isUp?: boolean;
+}
 
-const StatCard = ({ icon: Icon, color, label, value, trend, isUp }: any) => (
+const StatCard = ({ icon: Icon, color, label, value, trend, isUp }: StatCardProps) => (
   <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col gap-4 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300">
     <div className="flex items-center justify-between">
       <div className={`${color} p-4 rounded-2xl text-white shadow-lg shadow-current/20`}>
@@ -55,16 +60,16 @@ const InventoryPage = () => {
   const removeCar = useMutation(api.cars.deleteCar);
 
   // تصفية البيانات بناءً على البحث
-  const filteredCars = cars?.filter((car: any) => 
+  const filteredCars: CarType[] = (cars as CarType[] || [])?.filter((car: CarType) => 
     car.make.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    car.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    car.vin?.toLowerCase().includes(searchQuery.toLowerCase())
+    car.model.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
-  const handleDelete = async (id: any) => {
+  const handleDelete = async (id: Id<"cars">) => {
     if (window.confirm("هل أنت متأكد من حذف هذه السيارة؟")) {
       try {
-        await removeCar({ id });
+        const token = localStorage.getItem("convex_token") || "";
+        await removeCar({ carId: id, token });
       } catch (error) {
         console.error("خطأ أثناء الحذف:", error);
       }
@@ -154,20 +159,19 @@ const InventoryPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredCars.map((car: any) => (
+              {filteredCars.map((car: CarType) => (
                 <tr key={car._id} className="hover:bg-slate-50/80 transition-all group">
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-4">
                       <div className="w-14 h-10 rounded-lg bg-slate-100 overflow-hidden">
                         <img 
-                          src={car.mainImage || "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=150"} 
+                          src={car.mainImageUrl || "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=150"} 
                           className="w-full h-full object-cover"
                           alt="صورة السيارة"
                         />
                       </div>
                       <div>
                         <div className="font-black text-slate-900">{car.make} {car.model}</div>
-                        <div className="text-[10px] text-slate-400 font-bold tracking-tighter uppercase">{car.vin || 'بدون رقم تسلسلي'}</div>
                       </div>
                     </div>
                   </td>

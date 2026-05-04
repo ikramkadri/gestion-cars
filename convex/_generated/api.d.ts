@@ -12,6 +12,7 @@ import type * as activity_logs from "../activity_logs.js";
 import type * as auth from "../auth.js";
 import type * as bookings from "../bookings.js";
 import type * as cars from "../cars.js";
+import type * as customers from "../customers.js";
 import type * as favorites from "../favorites.js";
 import type * as files from "../files.js";
 import type * as invoices from "../invoices.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   bookings: typeof bookings;
   cars: typeof cars;
+  customers: typeof customers;
   favorites: typeof favorites;
   files: typeof files;
   invoices: typeof invoices;

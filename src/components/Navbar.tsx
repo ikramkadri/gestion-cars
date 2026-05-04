@@ -1,48 +1,75 @@
 import React from 'react';
-import { Car as CarIcon, Search, Bell } from 'lucide-react';
+import { Zap, Sun, Moon, User } from 'lucide-react';
+import { useLang } from '../lib/LanguageContext';
 
-interface NavbarProps {
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-}
+const Navbar = ({ onOpenAuth }: { onOpenAuth: () => void }) => {
+  const { lang, setLang, theme, toggleTheme, t } = useLang();
+  const [isScrolled, setIsScrolled] = React.useState(false);
 
-const Navbar = ({ searchQuery, setSearchQuery }: NavbarProps) => (
-  <nav className="bg-white/80 backdrop-blur-xl border-b border-slate-100 px-8 py-5 sticky top-0 z-[60]">
-    <div className="max-w-7xl mx-auto flex items-center justify-between">
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 bg-indigo-600 rounded-[1.2rem] flex items-center justify-center text-white shadow-xl shadow-indigo-100 rotate-3">
-          <CarIcon size={26} />
+  React.useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  return (
+    <nav className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ${
+      isScrolled ? 'bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-lg py-2' : 'bg-transparent py-6'
+    }`}>
+      <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+        
+        <div className="flex items-center gap-8">
+          {/* Logo */}
+          <div className="flex items-center gap-2 group cursor-pointer">
+            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+              <Zap className="text-white fill-white" size={24} />
+            </div>
+            <div className="flex flex-col">
+              <span className={`text-2xl font-black tracking-tighter transition-colors ${isScrolled ? 'text-slate-900 dark:text-white' : 'text-white'}`}>
+                MOTOR<span className="text-blue-500">IX</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Links */}
+          <div className={`hidden lg:flex gap-6 text-[13px] font-black uppercase ${isScrolled ? 'text-slate-500 dark:text-slate-400' : 'text-white/80'}`}>
+            <a href="#" className="hover:text-blue-500">{t('home')}</a>
+            <a href="#" className="hover:text-blue-500">{t('buy')}</a>
+            <a href="#" className="hover:text-blue-500">{t('news')}</a>
+          </div>
         </div>
-        <div className="flex flex-col text-right">
-          <span className="text-2xl font-black tracking-tighter uppercase leading-none">MOTORIX<span className="text-indigo-600"> PRO</span></span>
-          <span className="text-[10px] font-black text-slate-400 uppercase mt-1 tracking-widest">إدارة المخزون الذكية</span>
+
+        <div className="flex items-center gap-4">
+          {/* Theme Toggle */}
+          <button onClick={toggleTheme} className={`${isScrolled ? 'text-slate-600 dark:text-slate-300' : 'text-white'}`}>
+            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+          </button>
+
+          {/* Lang Toggle */}
+          <div className="flex items-center gap-2 bg-black/10 p-1 rounded-lg">
+            {['ar', 'fr', 'en'].map((l) => (
+              <button 
+                key={l}
+                onClick={() => setLang(l as 'ar' | 'fr' | 'en')}
+                className={`px-2 py-1 text-[10px] font-bold rounded ${lang === l ? 'bg-blue-600 text-white' : 'text-gray-400'}`}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          <button onClick={onOpenAuth} className={`hidden md:flex items-center gap-2 font-bold text-sm ${isScrolled ? 'text-slate-900 dark:text-white' : 'text-white'}`}>
+            <User size={18} />
+            {t('login')}
+          </button>
+
+          <button className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-black text-sm hover:bg-blue-700 transition-all">
+             {t('sellCar')}
+          </button>
         </div>
       </div>
-
-      <div className="hidden lg:flex flex-1 max-w-xl mx-12">
-        <div className="relative w-full group">
-          <Search className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
-          <input 
-            type="text" 
-            placeholder="ابحث بواسطة الماركة أو الموديل..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-100/80 border-2 border-transparent rounded-2xl py-3.5 pr-14 pl-5 text-sm font-bold focus:bg-white focus:border-indigo-500/20 outline-none transition-all shadow-inner text-right" 
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <button className="relative p-3 text-slate-500 hover:bg-slate-100 rounded-2xl transition-all">
-          <Bell size={22} />
-          <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white"></span>
-        </button>
-        <div className="w-12 h-12 rounded-[1.2rem] overflow-hidden border-2 border-indigo-100 shadow-md cursor-pointer hover:scale-105 transition-transform">
-          <img src="https://ui-avatars.com/api/?name=Admin&background=4f46e5&color=fff" alt="Admin" />
-        </div>
-      </div>
-    </div>
-  </nav>
-);
+    </nav>
+  );
+};
 
 export default Navbar;

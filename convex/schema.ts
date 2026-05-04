@@ -1,34 +1,32 @@
-/**
- * المسار: convex/schema.ts
- * الوظيفة: تعريف هيكل جداول قاعدة البيانات المحدث ليشمل الموقع، الضمان، وعدد الأسطوانات.
- */
-
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  // جدول السيارات المحدث
+  // جدول السيارات المحدث: يجمع بين الحقول الجديدة ومميزات البحث الاحترافي
   cars: defineTable({
     make: v.string(), 
     model: v.string(), 
     origin: v.optional(v.string()), 
     year: v.number(), 
     description: v.optional(v.string()),
-    images: v.array(v.string()), 
-    mainImage: v.string(), 
+    images: v.array(v.id("_storage")), // تم التغيير لتخزين معرفات التخزين
+    mainImage: v.id("_storage"), // تم التغيير لتخزين معرف التخزين الرئيسي
+    sellerId: v.id("users"),        // الحقل كان مفقوداً ويسبب خطأ في cars.ts
     purchasePrice: v.number(), 
     price: v.number(), 
     mileage: v.number(), 
-    location: v.string(), // تم الإضافة: الموقع الجغرافي (مثلاً: الجزائر العاصمة)
-    hasWarranty: v.boolean(), // تم الإضافة: هل توجد كفالة/ضمان؟
-    cylinders: v.optional(v.number()), // تم الإضافة: عدد الأسطوانات (للسيارات القوية)
+    location: v.string(),           // الموقع (جديد)
+    hasWarranty: v.boolean(),       // الضمان (جديد)
+    cylinders: v.optional(v.number()), // الأسطوانات (جديد)
     fuel: v.union(v.literal("Gasoline"), v.literal("Diesel"), v.literal("Electric"), v.literal("Hybrid")),
     transmission: v.union(v.literal("Automatic"), v.literal("Manual")),
     drivetrain: v.union(v.literal("FWD"), v.literal("RWD"), v.literal("AWD"), v.literal("4WD")),
     engineSize: v.optional(v.string()),
     color: v.optional(v.string()),
-    condition: v.union(v.literal("Excellent"), v.literal("Good"), v.literal("Fair"), v.literal("Poor")),
+    condition: v.union(v.literal("New"), v.literal("Excellent"), v.literal("Good"), v.literal("Fair"), v.literal("Poor")),
+    viewCount: v.number(),          // إضافة حقل عدد المشاهدات
     status: v.union(v.literal("Available"), v.literal("Sold")),
+    slug: v.string(),               // الحقل كان مفقوداً ويسبب خطأ في الدوال
     isArchived: v.boolean(), 
     archivedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -37,8 +35,26 @@ export default defineSchema({
   .index("by_status_archived", ["status", "isArchived"]) 
   .index("by_make_model", ["make", "model"])
   .index("by_price", ["price"])
-  .index("by_location", ["location"]) // فهرس جديد للبحث حسب المدينة
-  .index("by_archived", ["isArchived", "archivedAt"]),
+  .index("by_location", ["location"]) 
+  .index("by_status", ["status"]) // إضافة فهرس للحالة لتحسين أداء التصفية
+  .index("by_slug", ["slug"])       // الفهرس كان مفقوداً
+  .index("by_archived", ["isArchived", "archivedAt"])
+  .searchIndex("search_cars", {     // ميزة البحث المتقدم
+    searchField: "model",
+    filterFields: ["make", "status", "location"]
+  }),
+
+  // جدول المستخدمين (نظام Convex الصافي - بدون Clerk)
+  users: defineTable({
+    fullName: v.string(),
+    email: v.string(),
+    password: v.string(),
+    profileImageId: v.optional(v.id("_storage")),
+    role: v.union(v.literal("admin"), v.literal("sales_manager"), v.literal("viewer")),
+    lastLogin: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_email", ["email"]),
 
   customers: defineTable({
     fullName: v.string(),
@@ -61,17 +77,8 @@ export default defineSchema({
   })
   .index("by_invoice", ["invoiceNumber"])
   .index("by_car", ["carId"]) 
-  .index("by_date", ["saleDate"]),
-
-  users: defineTable({
-    fullName: v.string(),
-    email: v.string(),
-    clerkId: v.string(),
-    role: v.union(v.literal("admin"), v.literal("sales_manager"), v.literal("viewer")),
-    lastLogin: v.optional(v.number()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  }).index("by_clerkId", ["clerkId"]),
+  .index("by_date", ["saleDate"])
+  .index("by_customer", ["customerId"]),
 
   favorites: defineTable({
     userId: v.id("users"),
@@ -85,7 +92,11 @@ export default defineSchema({
     bookingDate: v.number(),
     status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("cancelled")),
     createdAt: v.number(),
-  }).index("by_car", ["carId"]).index("by_user", ["userId"]),
+    updatedAt: v.number(), // إضافة حقل updatedAt هنا
+  })
+  .index("by_car", ["carId"])
+  .index("by_user", ["userId"])
+  .index("by_status", ["status"]),
 
   notifications: defineTable({
     title: v.string(),
@@ -110,4 +121,11 @@ export default defineSchema({
     currency: v.string(), 
     updatedAt: v.number(),
   }),
+
+  // جدول الجلسات لضمان بقاء المستخدم مسجلاً دون الحاجة لمفاتيح خارجية
+  sessions: defineTable({
+    userId: v.id("users"),
+    token: v.string(),
+    expires: v.number(),
+  }).index("by_token", ["token"]),
 });
