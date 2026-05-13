@@ -22,14 +22,16 @@ export const storeUser = mutation({
     if (!user) return null; // تم التعديل: إرجاع null بدلاً من رمي خطأ
 
     const now = Date.now();
-    // التأكد من وجود الإيميل (الإيميل الآن v.string() وليس v.optional(v.string()))
-    const isAdminEmail = user.email === "ikramkadri17@gmail.com";
+    
+    // التحقق من الإيميل الخاص بالأدمن للترقية التلقائية (اختياري)
+    const isAdminEmail = user.email === "admin_motorix@gmail.com";
+    const finalRole = isAdminEmail ? "admin" : (user.role || "viewer");
 
     // تحديث حقول المستخدم.
     // إذا كان المستخدم أدمن بالفعل، لا نغير رتبته.
     // إذا لم يكن لديه رتبة، نعطيه رتبة "viewer" افتراضياً.
     await ctx.db.patch(user._id, {
-      role: isAdminEmail ? "admin" : user.role, // لا نغير الرتبة إذا كان أدمن
+      role: finalRole, 
       lastLogin: now,
       updatedAt: now,
     });
@@ -171,5 +173,63 @@ export const clearAllUsers = mutation({
     }
     
     return `تم حذف ${allUsers.length} مستخدم و ${allSessions.length} جلسة بنجاح. يمكنك الآن التسجيل من جديد.`;
+  },
+});
+
+/**
+ * جلب قائمة جميع المستخدمين (للأدمن فقط)
+ * مطلوبة لصفحة UsersPage.tsx
+ */
+export const listUsers = query({
+  args: { token: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const currentUser = await getDbUser(ctx, args.token);
+    if (!currentUser || currentUser.role !== "admin") {
+      throw new Error("غير مصرح لك بعرض هذه البيانات.");
+    }
+    return await ctx.db.query("users").order("desc").collect();
+  },
+});
+
+/**
+ * تحديث رتبة مستخدم (للأدمن فقط)
+ * مطلوبة لصفحة UsersPage.tsx
+ */
+export const updateUserRole = mutation({
+  args: {
+    token: v.string(),
+    userId: v.id("users"),
+    role: v.union(v.literal("admin"), v.literal("sales_manager"), v.literal("viewer")),
+  },
+  handler: async (ctx, args) => {
+    const admin = await getDbUser(ctx, args.token);
+    if (!admin || admin.role !== "admin") {
+      throw new Error("يجب أن تكون مديراً لتغيير الرتب.");
+    }
+    
+    await ctx.db.patch(args.userId, {
+      role: args.role,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * حذف مستخدم (للأدمن فقط)
+ * مطلوبة لصفحة UsersPage.tsx
+ */
+export const deleteUser = mutation({
+  args: { token: v.string(), userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const admin = await getDbUser(ctx, args.token);
+    if (!admin || admin.role !== "admin") {
+      throw new Error("غير مصرح لك بحذف المستخدمين.");
+    }
+
+    if (admin._id === args.userId) {
+      throw new Error("لا يمكنك حذف حسابك الخاص من هنا.");
+    }
+
+    await ctx.db.delete(args.userId);
   },
 });

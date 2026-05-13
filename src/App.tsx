@@ -6,11 +6,13 @@ import AdminLayout from "./layouts/AdminLayout";
 import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import InventoryPage from "./pages/InventoryPage";
-import { Loader2 } from 'lucide-react'; // استيراد Loader2
+import AddCarPage from "./pages/AddCarPage";
+import EditCarPage from "./pages/EditCarPage";
 import SettingsPage from "./pages/SettingsPage";
 import Navbar from "./components/Navbar";
 import { LanguageProvider } from "./lib/LanguageContext";
 import { Toaster } from 'react-hot-toast';
+import LoadingScreen from "./components/LoadingScreen";
 import { api } from "../convex/_generated/api";
 
 export default function App() {
@@ -29,13 +31,13 @@ function AppContent() {
     <LanguageProvider>
       <Toaster position="top-center" reverseOrder={false} />
       <Routes>
-        <Route path="/" element={<><Navbar onOpenAuth={() => navigate("/login")} /><LandingPage /></>} /> {/* Public landing page */}
+        {/* الصفحة الرئيسية: صفحة الهبوط التي تحتوي على السيارة والتحريك */}
+        <Route path="/" element={<><Navbar onOpenAuth={() => navigate("/login")} /><LandingPage /></>} /> 
         
         <Route path="/login" element={token ? <Navigate to="/admin" /> : <LoginPage />} />
         
         <Route path="/admin/*" element={token ? <AuthenticatedApp /> : <Navigate to="/login" />} />
 
-        {/* إعادة التوجيه الافتراضي */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </LanguageProvider>
@@ -73,18 +75,11 @@ function AuthenticatedApp() {
           user?.role === "admin" ? <Dashboard /> : <Navigate to="/admin/inventory" replace />
         } />
         <Route path="inventory" element={<InventoryPage />} />
+        <Route path="inventory/add" element={<AddCarPage />} />
+        <Route path="inventory/edit/:carId" element={<EditCarPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </AdminLayout>
-  );
-}
-
-function LoadingScreen() {
-  return (
-    <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-950 gap-4">
-      <Loader2 className="animate-spin text-blue-500" size={48} />
-      <div className="text-blue-500 font-black text-xl tracking-tighter animate-pulse uppercase">MOTORIX</div>
-    </div>
   );
 }

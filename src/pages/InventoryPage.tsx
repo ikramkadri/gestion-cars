@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 // استخدام الاستيرادات المطلوبة مع العلم أنها قد تسبب خطأ في المعاينة الفورية 
 // ولكنها ضرورية لبيئتك المحلية (Local Environment)
 import { useQuery, useMutation } from "convex/react";
@@ -17,6 +18,7 @@ import {
   Trash2,
   Edit3
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { Id } from "../../convex/_generated/dataModel";
 import { CarType } from '../features/cars/types/car.types';
 
@@ -53,7 +55,11 @@ const StatCard = ({ icon: Icon, color, label, value, trend, isUp }: StatCardProp
 
 const InventoryPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
   
+  const token = localStorage.getItem("convex_token") ?? undefined;
+  const user = useQuery(api.users.viewer, { token });
+
   // جلب البيانات من الباك اند (Convex)
   const cars = useQuery(api.cars.getCars, { includeArchived: false });
   const stats = useQuery(api.statistics.getDashboardStats);
@@ -67,11 +73,14 @@ const InventoryPage = () => {
 
   const handleDelete = async (id: Id<"cars">) => {
     if (window.confirm("هل أنت متأكد من حذف هذه السيارة؟")) {
+      const toastId = toast.loading("جاري حذف السيارة وصورها...");
       try {
         const token = localStorage.getItem("convex_token") || "";
         await removeCar({ carId: id, token });
+        toast.success("تم حذف السيارة بنجاح", { id: toastId });
       } catch (error) {
         console.error("خطأ أثناء الحذف:", error);
+        toast.error("فشل حذف السيارة، يرجى المحاولة لاحقاً", { id: toastId });
       }
     }
   };
@@ -100,9 +109,14 @@ const InventoryPage = () => {
               className="bg-white border border-slate-200 pr-11 pl-4 py-3 rounded-2xl w-full md:w-72 focus:ring-2 focus:ring-indigo-500/10 outline-none font-bold text-slate-700 transition-all shadow-sm text-right"
             />
           </div>
-          <button className="bg-indigo-600 text-white flex items-center gap-2 px-6 py-3 rounded-2xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all font-black">
-            <Plus size={20} /> إضافة مركبة
-          </button>
+          {user?.role !== "viewer" && (
+            <button 
+              onClick={() => navigate("/admin/inventory/add")}
+              className="bg-indigo-600 text-white flex items-center gap-2 px-6 py-3 rounded-2xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all font-black"
+            >
+              <Plus size={20} /> إضافة مركبة
+            </button>
+          )}
         </div>
       </div>
 
@@ -155,7 +169,7 @@ const InventoryPage = () => {
                 <th className="px-8 py-5">المواصفات</th>
                 <th className="px-8 py-5 text-right">السعر المعروض</th>
                 <th className="px-8 py-5 text-right">الحالة</th>
-                <th className="px-8 py-5 text-right">الإجراءات</th>
+                {user?.role !== "viewer" && <th className="px-8 py-5 text-right">الإجراءات</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -193,19 +207,28 @@ const InventoryPage = () => {
                       {car.status === "Available" ? "متاح" : "مباع"}
                     </span>
                   </td>
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-2 justify-end">
-                      <button className="p-2 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-300 transition-all">
-                        <Edit3 size={16} />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(car._id)}
-                        className="p-2 hover:bg-rose-50 hover:text-rose-600 rounded-lg text-slate-300 transition-all"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
+                  {user?.role !== "viewer" && (
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-2 justify-end">
+                        {(user?.role === "admin" || user?.role === "sales_manager") && (
+                          <button 
+                            onClick={() => navigate(`/admin/inventory/edit/${car._id}`)}
+                            className="p-2 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-300 transition-all"
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                        )}
+                        {user?.role === "admin" && (
+                          <button 
+                            onClick={() => handleDelete(car._id)}
+                            className="p-2 hover:bg-rose-50 hover:text-rose-600 rounded-lg text-slate-300 transition-all"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
               {filteredCars.length === 0 && (

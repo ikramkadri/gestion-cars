@@ -36,8 +36,10 @@ export async function getAuthenticatedUser(
 export const authenticate = action({
   args: { email: v.string(), name: v.string(), password: v.string() },
   handler: async (ctx, args): Promise<{ token: string; user: Doc<"users"> }> => {
+    const email = args.email.toLowerCase().trim();
+
     // 1. البحث عن المستخدم عبر Query داخلي
-    const user = await ctx.runQuery(internal.auth.getUserByEmailInternal, { email: args.email });
+    const user = await ctx.runQuery(internal.auth.getUserByEmailInternal, { email });
 
     if (user) {
       // 2. التحقق من كلمة المرور
@@ -52,7 +54,7 @@ export const authenticate = action({
     // 4. تشفير كلمة المرور لمستخدم جديد والتسجيل عبر Mutation داخلي
     const hashedPassword = await bcrypt.hash(args.password, 10);
     return await ctx.runMutation(internal.auth.registerUserInternal, {
-      email: args.email,
+      email,
       name: args.name,
       password: hashedPassword,
     });
@@ -77,7 +79,7 @@ export const registerUserInternal = internalMutation({
       fullName: args.name,
       email: args.email,
       password: args.password,
-      role: args.email === "ikramkadri17@gmail.com" ? "admin" : "viewer",
+      role: "viewer", // الافتراضي هو مشاهد، والأدمن يتم تعيينه يدوياً عبر Dashboard
       createdAt: now,
       updatedAt: now,
     });

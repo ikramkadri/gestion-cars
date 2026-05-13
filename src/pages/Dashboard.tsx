@@ -73,37 +73,44 @@ const Dashboard = () => {
 
       {/* كروت الإحصائيات (StatsCards) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <StatsCard 
-          icon={DollarSign} 
-          color="bg-indigo-600" 
-          label="إجمالي المبيعات" 
-          value={`${stats.financials.totalRevenue.toLocaleString()} د.ج`}
-          trend="+12.5%"
-          isUp={true}
-        />
-        <StatsCard 
-          icon={TrendingUp} 
-          color="bg-emerald-500" 
-          label="صافي الأرباح" 
-          value={`${stats.financials.totalProfit.toLocaleString()} د.ج`}
-          isUp={true}
-        />
+        {(user?.role === 'admin' || user?.role === 'sales_manager') && (
+          <StatsCard 
+            icon={DollarSign} 
+            color="bg-indigo-600" 
+            label="إجمالي المبيعات" 
+            value={`${stats.financials.totalRevenue.toLocaleString()} د.ج`}
+            trend="+12.5%"
+            isUp={true}
+          />
+        )}
+        {user?.role === 'admin' && (
+          <StatsCard 
+            icon={TrendingUp} 
+            color="bg-emerald-500" 
+            label="صافي الأرباح" 
+            value={`${stats.financials.totalProfit.toLocaleString()} د.ج`}
+            isUp={true}
+          />
+        )}
         <StatsCard 
           icon={Car} 
           color="bg-slate-900" 
           label="المخزون المتوفر" 
           value={`${stats.inventory.available} سيارة`}
         />
-        <StatsCard 
-          icon={Package} 
-          color="bg-amber-500" 
-          label="قيمة المخزون" 
-          value={`${(stats.financials.stockValue / 1000000).toFixed(1)}M د.ج`}
-        />
+        {user?.role === 'admin' && (
+          <StatsCard 
+            icon={Package} 
+            color="bg-amber-500" 
+            label="قيمة المخزون" 
+            value={`${(stats.financials.stockValue / 1000000).toFixed(1)}M د.ج`}
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* الرسم البياني (AreaChart) */}
+        {user?.role !== 'viewer' ? (
         <div className="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
           <div className="flex justify-between items-center mb-8">
             <h3 className="font-black text-slate-800 text-lg">تحليل المبيعات الشهرية</h3>
@@ -132,6 +139,13 @@ const Dashboard = () => {
             </ResponsiveContainer>
           </div>
         </div>
+        ) : (
+          <div className="lg:col-span-2 bg-indigo-600 p-8 rounded-[2.5rem] text-white flex flex-col justify-center items-center text-center">
+             <Car size={60} className="mb-4 opacity-20" />
+             <h3 className="text-2xl font-black mb-2">استكشف المخزون</h3>
+             <p className="font-bold opacity-80">يمكنك مشاهدة السيارات المتوفرة والبحث عن مواصفاتها من قسم المخزون.</p>
+          </div>
+        )}
 
         {/* سجل النشاطات (Activity Feed) */}
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
@@ -159,6 +173,7 @@ const Dashboard = () => {
       </div>
 
       {/* جدول أحدث العمليات (Recent Sales) */}
+      {user?.role !== 'viewer' && (
       <div className="mt-10 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-8 border-b border-slate-50 flex items-center justify-between">
           <h3 className="font-black text-slate-800 text-lg">أحدث المبيعات</h3>
@@ -204,6 +219,7 @@ const Dashboard = () => {
           </table>
         </div>
       </div>
+      )}
     </div>
   );
 };

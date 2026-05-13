@@ -26,8 +26,8 @@ interface CarInsertData {
   transmission: "Automatic" | "Manual";
   drivetrain: "FWD" | "RWD" | "AWD" | "4WD";
   engineSize?: string;
-  color?: string;
-  condition: "Excellent" | "Good" | "Fair" | "Poor";
+  color?: string; 
+  condition: "New" | "Excellent" | "Good" | "Fair" | "Poor"; 
   viewCount: number;
   status: "Available" | "Sold"; 
   isArchived: boolean;
@@ -59,7 +59,7 @@ export const addCar = mutation({
     drivetrain: v.union(v.literal("FWD"), v.literal("RWD"), v.literal("AWD"), v.literal("4WD")),
     engineSize: v.optional(v.string()),
     color: v.optional(v.string()),
-    condition: v.union(v.literal("Excellent"), v.literal("Good"), v.literal("Fair"), v.literal("Poor")),
+    condition: v.union(v.literal("New"), v.literal("Excellent"), v.literal("Good"), v.literal("Fair"), v.literal("Poor")),
   },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
@@ -143,12 +143,22 @@ export const deleteCar = mutation({
 
     const car = await ctx.db.get(args.carId);
     if (car) {
-      // حذف الصورة الرئيسية من التخزين السحابي لتوفير المساحة
-      if (car.mainImage) await ctx.storage.delete(car.mainImage);
-      // حذف مصفوفة الصور
-      for (const imgId of car.images) {
-        await ctx.storage.delete(imgId);
+      // جمع كافة المعرفات في Set لضمان عدم تكرار الحذف لنفس الملف (mainImage غالباً موجود في images)
+      const storageIdsToDelete = new Set<Id<"_storage">>(car.images);
+      if (car.mainImage) {
+        storageIdsToDelete.add(car.mainImage);
       }
+      
+      const deletePromises = Array.from(storageIdsToDelete).map(async (imgId) => {
+        try {
+          await ctx.storage.delete(imgId);
+        } catch (error) {
+          // نتجاهل الخطأ إذا كان الملف غير موجود بالفعل لتجنب تعطل عملية الحذف
+          console.warn(`File with storage ID ${imgId} not found, skipping.`);
+        }
+      });
+      
+      await Promise.all(deletePromises);
       await ctx.db.delete(args.carId);
     }
   },
@@ -172,18 +182,12 @@ export const getCars = query({
 
     return await Promise.all(
       cars.map(async (car: Doc<"cars">) => {
-        // تحويل معرفات التخزين إلى روابط URL
+        // تحسين الأداء: جلب رابط الصورة الرئيسية فقط للقوائم
         const mainImageUrl = car.mainImage ? await ctx.storage.getUrl(car.mainImage) : null;
-        const imagesUrls = await Promise.all(
-          car.images.map(async (imgId: Id<"_storage">) => {
-            // التأكد من أن imgId ليس null أو undefined قبل استخدامه
-            return imgId ? await ctx.storage.getUrl(imgId) : null;
-          })
-        );
         return {
           ...car,
           mainImageUrl,
-          imagesUrls,
+          // لا نحتاج imagesUrls هنا لتسريع التحميل
         };
       })
     );
@@ -206,26 +210,33 @@ export const searchCars = query({
       results = await ctx.db
         .query("cars")
         .withSearchIndex("search_cars", (q) => {
-          let search = q.search("model", args.searchTerm);
+          let search = q.search("model", args.searchTerm)
+            .eq("isArchived", false);
+          
           if (args.make) search = search.eq("make", args.make);
-          if (args.status) search = search.eq("status", args.status);
+          search = search.eq("status", args.status ?? "Available");
           if (args.location) search = search.eq("location", args.location);
           return search;
         })
         .collect();
     } else {
-      results = await ctx.db.query("cars").order("desc").collect();
+      // في حال عدم وجود نص بحث، نستخدم الفهارس العادية للفلترة
+      let q = ctx.db.query("cars")
+        .withIndex("by_status_archived", (dbQ) => 
+          dbQ.eq("status", args.status ?? "Available").eq("isArchived", false)
+        );
+      
+      results = await q.order("desc").collect();
+
+      // تصفية إضافية للموقع والماركة إذا تم اختيارهما
+      if (args.location) results = results.filter(c => c.location === args.location);
+      if (args.make) results = results.filter(c => c.make === args.make);
     }
 
     // تحويل معرفات التخزين إلى روابط URL للنتائج
     return await Promise.all(results.map(async (car: Doc<"cars">) => {
       const mainImageUrl = car.mainImage ? await ctx.storage.getUrl(car.mainImage) : null;
-      const imagesUrls = await Promise.all(
-        car.images.map(async (imgId: Id<"_storage">) => {
-          return imgId ? await ctx.storage.getUrl(imgId) : null;
-        })
-      );
-      return { ...car, mainImageUrl, imagesUrls };
+      return { ...car, mainImageUrl };
     }));
   },
 });

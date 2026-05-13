@@ -7,7 +7,16 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
 export const getSettings = query({
-  handler: async (ctx) => await ctx.db.query("site_settings").first(),
+  handler: async (ctx) => {
+    const settings = await ctx.db.query("site_settings").first();
+    if (!settings) return null;
+
+    let logoUrl = null;
+    if (settings.logoImageId) {
+      logoUrl = await ctx.storage.getUrl(settings.logoImageId);
+    }
+    return { ...settings, logoUrl };
+  },
 });
 
 export const updateSettings = mutation({
@@ -15,8 +24,9 @@ export const updateSettings = mutation({
     showroomName: v.string(), 
     contactPhone: v.string(),
     contactEmail: v.string(), 
-    address: v.string(), 
-    currency: v.string()
+    address: v.string(),
+    currency: v.string(),
+    logoImageId: v.optional(v.id("_storage")), // إضافة حقل لمعرف صورة الشعار
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db.query("site_settings").first();

@@ -15,7 +15,7 @@ interface LanguageContextType {
 const translations = {
   ar: {
     searchPlaceholder: "ابحث عن الماركة، الموديل...",
-    sellCar: "بيع سيارتك",
+    // sellCar: "بيع سيارتك", // تم إزالة هذا الخيار بناءً على طلبك
     home: "الرئيسية",
     buy: "شراء سيارة",
     auctions: "المزادات",
@@ -27,7 +27,7 @@ const translations = {
   },
   fr: {
     searchPlaceholder: "Chercher marque, modèle...",
-    sellCar: "Vendre",
+    // sellCar: "Vendre", // Removed as per request
     home: "Accueil",
     buy: "Acheter",
     auctions: "Enchères",
@@ -39,7 +39,7 @@ const translations = {
   },
   en: {
     searchPlaceholder: "Search brand, model...",
-    sellCar: "Sell Car",
+    // sellCar: "Sell Car", // Removed as per request
     home: "Home",
     buy: "Buy",
     auctions: "Auctions",

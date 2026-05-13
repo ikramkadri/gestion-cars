@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useMutation } from 'convex/react';
+import { toast } from 'react-hot-toast'; // Added missing import
 import { 
-  Car, MapPin, CheckCircle2,
-  ChevronLeft, ChevronRight, Image as ImageIcon,
-  Loader2, // تم إضافة Loader2 هنا
-  Settings2, Palette,
-  Zap, Info, Trash2, Camera, Plus, MousePointerClick,
-  TrendingUp, TrendingDown, Search, AlertCircle, Pipette, AlertTriangle, X
+  Car, MapPin, CheckCircle2, ChevronLeft, ChevronRight,
+  Settings2, Palette, TrendingUp, TrendingDown,
+  Zap, Info, Trash2, Camera, Plus, MousePointerClick, Pipette,
+  Search, AlertCircle, Loader2,
 } from 'lucide-react';
 import { Id } from '../../convex/_generated/dataModel'; // استيراد Id من Convex
+import { api } from '../../convex/_generated/api';
 
 // --- الثوابت ---
 const CAR_MAKES = ['Toyota', 'Hyundai', 'Volkswagen', 'Renault', 'Peugeot', 'Dacia', 'Kia', 'Mercedes-Benz', 'BMW', 'Audi', 'Ford', 'Nissan', 'Chevrolet', 'Suzuki', 'Mitsubishi', 'Honda', 'Seat', 'Skoda', 'Fiat'];
@@ -132,29 +133,6 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ label, value, onC
   );
 };
 
-// دالة ضغط الصور لتقليل الحجم قبل الرفع
-const compressImage = async (file: File): Promise<Blob> => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_WIDTH = 1200; // تقليل العرض الأقصى لسرعة الرفع
-        const scaleSize = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scaleSize;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        // تحويل الصورة إلى JPEG بجودة 70% لتقليل الحجم بشكل كبير
-        canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", 0.7);
-      };
-    };
-  });
-};
-
 // تعريف نوع الصورة للمعاينة والرفع
 interface ImageItem {
   storageId: Id<"_storage">;
@@ -165,15 +143,18 @@ interface AddCarFormProps {
   onSubmit: (data: CarFormData) => void | Promise<void>;
   isLoading: boolean;
   title?: string;
-  initialData?: any;
+  initialData?: CarFormData; // تحديد نوع initialData بشكل أكثر دقة
 }
 
 const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps) => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [uploadedImages, setUploadedImages] = useState<ImageItem[]>([]); // استخدام ImageItem بدلاً من string[]
+  const [uploadedImages, setUploadedImages] = useState<ImageItem[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const generateUploadUrl = useMutation(api.cars.generateUploadUrl);
+
   const [tempColor, setTempColor] = useState('#FFFFFF');
   const [isColorConfirmed, setIsColorConfirmed] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
@@ -196,12 +177,32 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     engineSize: initialData?.engineSize || '',
   }); // استخدام initialData لتهيئة formData
 
+  // تحميل الصور الموجودة واللون في حال التعديل
+  useEffect(() => {
+    const initial = initialData as any;
+    if (initial?.mainImage && initial?.mainImageUrl) {
+      const images: ImageItem[] = [{ storageId: initial.mainImage, url: initial.mainImageUrl }];
+      if (initial.images && initial.imagesUrls) {
+        initial.images.forEach((id: Id<"_storage">, index: number) => {
+          if (id !== initial.mainImage && initial.imagesUrls[index]) {
+            images.push({ storageId: id, url: initial.imagesUrls[index] });
+          }
+        });
+      }
+      setUploadedImages(images);
+      if (initial.color) {
+        setTempColor(initial.color);
+        setIsColorConfirmed(true);
+      }
+    }
+  }, [initialData]);
+
   // تحويل completedSteps إلى حالة مشتقة
   const completedSteps = React.useMemo(() => {
     const steps: number[] = [];
     if (formData.make && formData.model && formData.year) steps.push(1);
     if (isColorConfirmed && formData.condition) steps.push(2);
-    if (formData.price > 0 && formData.location && formData.fuel && formData.transmission && formData.drivetrain) steps.push(3); // إضافة تحقق للحقول الجديدة
+    if (formData.price > 0 && formData.location && formData.fuel && formData.transmission && formData.drivetrain) steps.push(3);
     if (uploadedImages.length > 0) steps.push(4);
     return steps;
   }, [formData, isColorConfirmed, uploadedImages.length]);
@@ -214,7 +215,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     if (currentStep === 1) {
       if (!formData.make) newErrors.make = "يرجى اختيار الماركة";
       if (!formData.model) newErrors.model = "يرجى كتابة الموديل";
-      if (formData.year < 1900 || formData.year > new Date().getFullYear() + 1) newErrors.year = "سنة الصنع غير منطقية";
+      if (formData.year < 1900 || formData.year > 2026) newErrors.year = "سنة الصنع غير منطقية";
     } else if (currentStep === 2) {
       if (!isColorConfirmed) newErrors.color = "يجب تأكيد اللون المختار أولاً";
       if (!formData.fuel) newErrors.fuel = "يرجى اختيار نوع الوقود";
@@ -240,14 +241,41 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const confirmSubmit = () => {
-    const finalData = {
-      ...formData,
-      mainImage: uploadedImages[0]?.storageId,
-      images: uploadedImages.map((img: ImageItem) => img.storageId)
-    };
-    onSubmit(finalData as CarFormData);
-    setShowConfirmModal(false);
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const token = localStorage.getItem("convex_token") || "";
+
+    try {
+      for (const file of Array.from(files)) {
+        // 1. الحصول على رابط الرفع
+        const postUrl = await generateUploadUrl({ token });
+
+        // 2. الرفع للسيرفر
+        const result = await fetch(postUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+
+        if (!result.ok) throw new Error("Upload failed");
+        const { storageId } = await result.json();
+
+        // 3. تحديث مصفوفة الصور
+        setUploadedImages(prev => [...prev, {
+          storageId,
+          url: URL.createObjectURL(file)
+        }]);
+      }
+      toast.success("تم رفع الصور بنجاح");
+    } catch (error) {
+      console.error(error);
+      toast.error("فشل في رفع الصور");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const profit = formData.price - formData.purchasePrice;
@@ -344,7 +372,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               <label className="text-md font-black text-gray-800 flex items-center gap-2 mb-6"><Info className="text-blue-500" /> حالة السيارة</label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {CONDITIONS.map((cond) => (
-                  <button key={cond.id} onClick={() => setFormData({...formData, condition: cond.id})} className={`p-4 rounded-3xl flex flex-col items-center gap-3 transition-all border-4 ${formData.condition === cond.id ? 'border-blue-500 bg-white shadow-xl scale-105' : 'border-transparent bg-white/50 opacity-60'}`}>
+                  <button key={cond.id} onClick={() => setFormData({...formData, condition: cond.id as CarCondition})} className={`p-4 rounded-3xl flex flex-col items-center gap-3 transition-all border-4 ${formData.condition === cond.id ? 'border-blue-500 bg-white shadow-xl scale-105' : 'border-transparent bg-white/50 opacity-60'}`}>
                     <span className="text-3xl">{cond.icon}</span>
                     <span className="font-black text-xs text-gray-800">{cond.label}</span>
                     <div className={`w-full h-2 rounded-full ${cond.color}`} />
@@ -361,8 +389,8 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* نوع الوقود */}
                 <div className="space-y-4">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">نوع الوقود</label>
-                  <div className="flex flex-wrap gap-2">
+                  <label className="text-sm font-bold text-gray-500 mr-2 block text-right">نوع الوقود</label>
+                  <div className="flex flex-wrap gap-2 justify-end">
                     {FUEL_TYPES.map(type => (
                       <button
                         key={type}
@@ -373,12 +401,13 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
                       </button>
                     ))}
                   </div>
+                  {errors.fuel && <p className="text-red-500 text-xs font-bold mt-1 mr-2">{errors.fuel}</p>}
                 </div>
 
                 {/* ناقل الحركة */}
                 <div className="space-y-4">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">ناقل الحركة</label>
-                  <div className="flex gap-2">
+                  <label className="text-sm font-bold text-gray-500 mr-2 block text-right">ناقل الحركة</label>
+                  <div className="flex gap-2 justify-end">
                     {TRANSMISSIONS.map(type => (
                       <button
                         key={type}
@@ -389,12 +418,13 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
                       </button>
                     ))}
                   </div>
+                  {errors.transmission && <p className="text-red-500 text-xs font-bold mt-1 mr-2">{errors.transmission}</p>}
                 </div>
 
                 {/* نظام الدفع */}
                 <div className="space-y-4">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">نظام الدفع</label>
-                  <div className="flex gap-2">
+                  <label className="text-sm font-bold text-gray-500 mr-2 block text-right"> نظام الدفع</label>
+                  <div className="flex gap-2 justify-end">
                     {DRIVETRAINS.map(type => (
                       <button
                         key={type}
@@ -405,14 +435,15 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
                       </button>
                     ))}
                   </div>
+                  {errors.drivetrain && <p className="text-red-500 text-xs font-bold mt-1 mr-2">{errors.drivetrain}</p>}
                 </div>
 
                 {/* الضمان */}
                 <div className="space-y-4">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">الضمان</label>
+                  <label className="text-sm font-bold text-gray-500 mr-2 block text-right">الضمان</label>
                   <button
                     onClick={() => setFormData({...formData, hasWarranty: !formData.hasWarranty})}
-                    className={`w-full px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${formData.hasWarranty ? 'bg-emerald-500 text-white shadow-lg' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                    className={`w-full px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${formData.hasWarranty ? 'bg-emerald-50 text-white shadow-lg' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                   >
                     <CheckCircle2 size={16} />
                     {formData.hasWarranty ? "متوفر" : "غير متوفر"}
@@ -422,29 +453,16 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">حجم المحرك</label>
-                  <input 
-                    type="text" 
-                    value={formData.engineSize} 
-                    onChange={(e) => setFormData({...formData, engineSize: e.target.value})} 
-                    placeholder="مثال: 2.0L"
-                    className="w-full p-4 rounded-2xl bg-gray-50 border-none text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                  />
+                  <label className="text-sm font-bold text-gray-500 mr-2 block text-right">حجم المحرك</label>
+                  <input type="text" value={formData.engineSize || ''} onChange={(e) => setFormData({...formData, engineSize: e.target.value})} placeholder="مثال: 2.0L" className="w-full p-4 rounded-2xl bg-gray-50 border-none text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">الأسطوانات</label>
-                  <input 
-                    type="number" 
-                    value={formData.cylinders} 
-                    onChange={(e) => setFormData({...formData, cylinders: Number(e.target.value)})} 
-                    className="w-full p-4 rounded-2xl bg-gray-50 border-none text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" 
-                  />
+                  <label className="text-sm font-bold text-gray-500 mr-2 block text-right">الأسطوانات</label>
+                  <input type="number" value={formData.cylinders || ''} onChange={(e) => setFormData({...formData, cylinders: Number(e.target.value)})} className="w-full p-4 rounded-2xl bg-gray-50 border-none text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" />
                 </div>
               </div>
-            </div>
 
-            <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm space-y-8">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between pt-8 border-t border-gray-50">
                 <label className="text-md font-black text-gray-800 flex items-center gap-2"><Palette className="text-pink-500" /> لون الهيكل</label>
                 <div className="flex items-center gap-2 text-xs font-black text-gray-400 bg-gray-50 px-3 py-1 rounded-full">
                     <Pipette size={14} />
@@ -528,14 +546,14 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
                 <label className="text-xs font-black text-gray-400 mb-3 block">تكلفة الشراء الكلية</label>
                 <div className="flex items-center gap-3">
-                  <input type="number" value={formData.purchasePrice || ''} onChange={(e) => setFormData({...formData, purchasePrice: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent" placeholder="0" />
+                  <input type="number" value={formData.purchasePrice || ''} onChange={(e) => setFormData({...formData, purchasePrice: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent focus:text-indigo-600 transition-colors" placeholder="0" />
                   <span className="font-black text-gray-300">دج</span>
                 </div>
               </div>
               <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-blue-100 focus-within:border-blue-500 transition-all">
                 <label className="text-xs font-black text-blue-600 mb-3 block">سعر العرض للبيع</label>
                 <div className="flex items-center gap-3">
-                  <input type="number" value={formData.price || ''} onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent text-blue-700" placeholder="0" />
+                  <input type="number" value={formData.price || ''} onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent text-blue-700 focus:text-indigo-700 transition-colors" placeholder="0" />
                   <span className="font-black text-blue-200">دج</span>
                 </div>
               </div>
@@ -580,9 +598,9 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
              </div>
              
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {uploadedImages.map((_, i) => (
-                <div key={i} className="aspect-square bg-white rounded-3xl relative flex items-center justify-center text-gray-200 border-2 border-gray-100 shadow-sm overflow-hidden group">
-                  <ImageIcon size={48} />
+              {uploadedImages.map((img, i) => (
+                <div key={img.storageId} className="aspect-square bg-white rounded-3xl relative flex items-center justify-center border-2 border-gray-100 shadow-sm overflow-hidden group hover:shadow-md transition-all">
+                  <img src={img.url} className="w-full h-full object-cover" alt="Car" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <button onClick={() => setUploadedImages(uploadedImages.filter((_, idx) => idx !== i))} className="p-3 bg-red-500 text-white rounded-2xl shadow-xl hover:scale-110 active:scale-95 transition-all">
                         <Trash2 size={20}/>
@@ -590,11 +608,16 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
                   </div>
                 </div>
               ))}
-              <button onClick={() => {}} className="aspect-square border-4 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all group">
-                <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                    <Plus size={24} />
+              <input type="file" ref={fileInputRef} className="hidden" multiple accept="image/*" onChange={handleFileChange} />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="aspect-square border-4 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 text-gray-400 hover:border-indigo-400 hover:text-indigo-500 hover:bg-indigo-50 transition-all group disabled:opacity-50 active:scale-95"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
+                    {isUploading ? <Loader2 className="animate-spin text-indigo-600" /> : <Plus size={24} />}
                 </div>
-                <span className="text-[10px] font-black uppercase tracking-widest">إضافة صورة</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">{isUploading ? 'جاري الرفع...' : 'إضافة صورة'}</span>
               </button>
             </div>
 
@@ -635,7 +658,15 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
           <button 
             disabled={completedSteps.length < 4} 
             className={`px-14 py-4 rounded-2xl font-black transition-all shadow-xl flex items-center gap-3 ${completedSteps.length === 4 ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 hover:-translate-y-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={() => setShowConfirmModal(true)}
+            onClick={() => {
+              // دمج بيانات الصور المرفوعة مع بيانات النموذج قبل الإرسال
+              const finalData = {
+                ...formData,
+                mainImage: uploadedImages[0]?.storageId, // أول صورة هي الرئيسية إجبارياً
+                images: uploadedImages.map(img => img.storageId)
+              };
+              onSubmit(finalData as CarFormData);
+            }}
           >
             <Zap size={20}/>
             حفظ ونشر الإعلان
@@ -648,51 +679,6 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
         <div className="mt-6 flex items-center gap-2 justify-center text-amber-600 bg-amber-50 p-4 rounded-2xl border border-amber-100">
             <AlertCircle size={18} />
             <span className="text-xs font-black">يرجى إكمال جميع الخطوات (تأكد من اختيار اللون وتأكيده وصورة واحدة على الأقل)</span>
-        </div>
-      )}
-
-      {/* Confirm Modal */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden text-right" dir="rtl">
-            <div className="p-6 bg-amber-500 text-white flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="animate-pulse" />
-                <h3 className="font-black text-xl">تأكيد نشر الإعلان</h3>
-              </div>
-              <button onClick={() => setShowConfirmModal(false)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="p-8 space-y-6">
-              <div className="space-y-4">
-                <p className="text-slate-600 dark:text-slate-300 font-bold leading-relaxed">
-                  هل أنت متأكد من رغبتك في نشر إعلان لسيارة <span className="text-blue-600 font-black">{formData.make} {formData.model}</span>؟
-                </p>
-                <p className="text-sm text-slate-500 font-medium">
-                  بمجرد التأكيد، ستظهر السيارة في قائمة المخزون وستكون متاحة للعملاء.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <button 
-                  onClick={confirmSubmit}
-                  disabled={isLoading}
-                  className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black hover:bg-blue-700 transition-all shadow-xl shadow-blue-200 flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {isLoading ? <Loader2 className="animate-spin" /> : <Zap size={20}/>}
-                  تأكيد النشر الآن
-                </button>
-                <button 
-                  onClick={() => setShowConfirmModal(false)}
-                  className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-black hover:bg-slate-200 transition-all"
-                >
-                  إلغاء والعودة
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>
