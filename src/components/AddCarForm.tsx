@@ -69,8 +69,8 @@ export interface CarFormData {
   hasWarranty: boolean;
   cylinders?: number;
   engineSize?: string;
-  mainImage: Id<"_storage"> | null; // يجب أن يكون null إذا لم يتم الرفع
-  images: Id<"_storage">[]; // مصفوفة معرفات الصور
+  mainImage?: Id<"_storage">;
+  images?: Id<"_storage">[];
 }
 
 interface AutocompleteInputProps {
@@ -150,7 +150,7 @@ interface AddCarFormProps {
 }
 
 const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps) => {
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl); // Assuming 'files' module for uploads
+  const generateUploadUrl = useMutation(api.cars.generateUploadUrl);
   const [isUploading, setIsUploading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedImages, setUploadedImages] = useState<ImageItem[]>([]); // استخدام uploadedImages
@@ -162,7 +162,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState<CarFormData>({
-    make: initialData?.make || '', // Fixed computed property name error
+    make: initialData?.make || '',
     model: initialData?.model || '',
     origin: initialData?.origin || '',
     year: initialData?.year || new Date().getFullYear(),
@@ -172,7 +172,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     mileage: initialData?.mileage || 0,
     location: initialData?.location || '',
     vin: initialData?.vin || '',
-    color: initialData?.color || '#FFFFFF',
+    color: initialData?.color || undefined, // Default to undefined if no color
     condition: initialData?.condition || 'Excellent' as CarCondition, // تحديد النوع الافتراضي
     fuel: initialData?.fuel || 'Gasoline',
     transmission: initialData?.transmission || 'Automatic',
@@ -180,8 +180,8 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     hasWarranty: initialData?.hasWarranty || false,
     cylinders: initialData?.cylinders || 4,
     engineSize: initialData?.engineSize || '',
-    mainImage: initialData?.mainImage || null,
-    images: initialData?.images || [],
+    mainImage: initialData?.mainImage || undefined,
+    images: initialData?.images || undefined,
   }); // استخدام initialData لتهيئة formData
 
   // تحميل الصور الموجودة واللون في حال التعديل
@@ -200,7 +200,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
       }
       setUploadedImages(initialImages);
       if (initialData.color) {
-        setTempColor(initialData.color);
+        setTempColor(initialData.color); // Use initialData.color directly
         setIsColorConfirmed(true);
       }
     }
@@ -254,21 +254,19 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     if (!files || files.length === 0) return;
     
     setIsUploading(true); // Correctly using setIsUploading
-    const token = localStorage.getItem("convex_token") || "";
 
     try {
       for (const file of Array.from(files)) {
-        const postUrl = await generateUploadUrl({ token });
-        const result = await fetch(postUrl, { method: "POST", body: file });
+        const postUrl = await generateUploadUrl();
+        const result = await fetch(postUrl, { 
+          method: "POST", 
+          headers: { "Content-Type": file.type }, 
+          body: file 
+        });
         const { storageId } = await result.json();
 
-        if (!formData.mainImage && uploadedImages.length === 0) { // Only set mainImage if it's the first upload
-          setFormData((prev) => ({ ...prev, mainImage: storageId as Id<"_storage"> })); 
-        } else {
-          setFormData((prev) => ({ ...prev, images: [...(prev.images || []), storageId as Id<"_storage">] }));
-        }
         setUploadedImages((prev: ImageItem[]) => [...prev, { 
-          storageId,
+          storageId: storageId as string,
           url: URL.createObjectURL(file)
         }]);
       }
@@ -281,11 +279,15 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
   };
 
   const confirmSubmit = () => {
+    if (uploadedImages.length === 0) {
+      toast.error("يرجى إضافة صورة واحدة على الأقل");
+      return;
+    }
     // دمج بيانات الصور المرفوعة مع بيانات النموذج قبل الإرسال
     const finalData = {
       ...formData,
-      mainImage: uploadedImages[0]?.storageId || null, // أول صورة هي الرئيسية إجبارياً
-      images: uploadedImages.slice(1).map(img => img.storageId as Id<"_storage">) // باقي الصور
+      mainImage: uploadedImages[0]?.storageId, // أول صورة هي الرئيسية إجبارياً
+      images: uploadedImages.slice(1).map(img => img.storageId) // باقي الصور
     };
     onSubmit(finalData as CarFormData); 
     setShowConfirmModal(false);
@@ -350,7 +352,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
                 <label className="text-sm font-bold text-gray-600 mr-2 block text-right">الموديل</label>
                 <input 
                   value={formData.model} 
-                  onChange={(e) => setFormData({...formData, model: e.target.value})} 
+                onChange={(e) => setFormData({...formData, model: e.target.value})} 
                   className={`w-full p-4 rounded-2xl border-2 ${errors.model ? 'border-red-500' : 'border-transparent'} focus:border-blue-500 focus:bg-white outline-none bg-white shadow-sm transition-all text-right`} 
                   placeholder="مثال: Camry, Golf..." 
                 />
@@ -379,7 +381,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               <label className="text-sm font-bold text-gray-600 mr-2 block text-right">رقم الهيكل (VIN)</label>
               <input // Added VIN input
                 value={formData.vin} 
-                onChange={(e) => setFormData({...formData, vin: e.target.value})} 
+                onChange={(e) => setFormData({...formData, vin: e.target.value || undefined})} 
                 className="w-full p-4 rounded-2xl border-2 border-transparent focus:border-blue-500 focus:bg-white outline-none bg-white shadow-sm transition-all text-right" 
                 placeholder="أدخل رقم الهيكل الاختياري..." 
               />
@@ -475,7 +477,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
                   <label className="text-sm font-bold text-gray-500 mr-2 block">حجم المحرك</label>
                   <input 
                     type="text" 
-                    value={formData.engineSize} 
+                    value={formData.engineSize || ''}
                     onChange={(e) => setFormData({...formData, engineSize: e.target.value})} 
                     placeholder="مثال: 2.0L"
                     className="w-full p-4 rounded-2xl bg-gray-50 border-none text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" 

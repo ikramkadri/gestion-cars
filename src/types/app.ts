@@ -16,24 +16,20 @@ export type SaleWithDetails = Doc<"sales"> & {
   identityNum?: string;
 };
 
-export type UserRole = "admin" | "sales_manager" | "viewer";
+/** رتب المستخدمين مستخرجة مباشرة من قاعدة البيانات لضمان التطابق التام */
+export type UserRole = Doc<"users">["role"];
 
-export interface ClientDetails extends Doc<"customers"> {
-  _id: Doc<"customers">["_id"];
-  fullName: string;
-  phone: string;
-  email?: string;
-  address?: string;
-  identityNum?: string;
-  status: string;
-  totalPurchases: number;
-  createdAt: number;
-  updatedAt: number;
-}
+/** 
+ * تفاصيل الزبون: نستخدم النوع المولد تلقائياً من Convex 
+ * هذا يغنينا عن صيانة قائمة الحقول يدوياً هنا وفي schema.ts
+ */
+export type ClientDetails = Doc<"customers">;
 
-export interface BookingWithDetails extends Doc<"bookings"> {
+/**
+ * يمثل طلب حجز مع البيانات الكاملة للسيارة والزبون
+ * نستخدم التقاطع (&) لإضافة الحقول التي يتم جلبها عبر الـ Join في Query
+ */
+export type BookingWithDetails = Doc<"bookings"> & {
   carDetails: CarType;
   clientDetails: ClientDetails;
-  status: "pending" | "confirmed" | "cancelled" | "rejected";
-  rejectionReason?: string;
-}
+};

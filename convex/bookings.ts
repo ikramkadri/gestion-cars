@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation, internalAction } from "./_generated/server";
+import { mutation, query, internalAction } from "./_generated/server";
 import { getAuthenticatedUser } from "./auth";
 import { internal } from "./_generated/api"; // استيراد internal لاستدعاء الدوال الداخلية
 
@@ -43,47 +43,18 @@ export const reserveCar = mutation({
     const car = await ctx.db.get(args.carId);
     const carName = car ? `${car.make} ${car.model}` : "سيارة غير معروفة";
 
-    // إرسال إشعار داخلي لمديري المبيعات
-    await ctx.runMutation(internal.bookings.sendNewBookingNotificationToManagers, {
-      carName,
-      customerName: user.fullName,
-      bookingId,
+    // نظام الإشعارات العالمي: إرسال تنبيه فوري للإدارة مع رابط مباشر
+    await ctx.db.insert("notifications", {
+      title: "طلب حجز جديد 🚗",
+      message: `قام العميل ${user.fullName} بحجز ${carName}. يرجى المراجعة.`,
+      type: "reservation", // استخدام التصنيف الصحيح
+      priority: "high",
+      actionUrl: `/admin/bookings?id=${bookingId}`,
+      isRead: false,
+      createdAt: now,
     });
 
     return bookingId;
-  },
-});
-
-/**
- * دالة داخلية لإرسال إشعار بوجود حجز جديد لمديري المبيعات.
- * لا يمكن استدعاؤها مباشرة من الواجهة الأمامية.
- */
-export const sendNewBookingNotificationToManagers = internalMutation({
-  args: {
-    carName: v.string(),
-    customerName: v.string(),
-    bookingId: v.id("bookings"),
-  },
-  handler: async (ctx, args) => {
-    const managers = await ctx.db
-      .query("users")
-      .filter((q) => q.or(q.eq(q.field("role"), "admin"), q.eq(q.field("role"), "sales_manager")))
-      .collect();
-
-    const now = Date.now();
-
-    for (const manager of managers) {
-      await ctx.db.insert("notifications", {
-        userId: manager._id,
-        title: "طلب حجز جديد 🔔",
-        message: `قام ${args.customerName} بطلب حجز لسيارة ${args.carName}.`,
-        type: "info",
-        isRead: false,
-        createdAt: now,
-        // يمكن إضافة رابط لصفحة الحجز في لوحة التحكم
-        link: `/admin/bookings?bookingId=${args.bookingId}`,
-      });
-    }
   },
 });
 
@@ -217,8 +188,9 @@ export const approveBooking = mutation({
       title: "تم قبول طلب حجزك ✅",
       message: `تمت الموافقة على طلب حجزك لسيارة ${carName}. يمكنك الآن التوجه للمعرض لإتمام الإجراءات.`,
       type: "success",
+      priority: "high",
       isRead: false,
-      link: "/admin/bookings",
+      actionUrl: "/my-bookings",
       createdAt: Date.now(),
     });
 
@@ -264,9 +236,10 @@ export const rejectBooking = mutation({
         userId: booking.userId,
         title: "تحديث بخصوص حجزك ⚠️",
         message: `نعتذر منك، تم رفض طلب الحجز للسبب التالي: ${args.reason}`,
-        type: "error", 
-        isRead: false, 
-        link: "/admin/bookings",
+        type: "warning",
+        priority: "medium",
+        isRead: false,
+        actionUrl: "/my-bookings",
         createdAt: Date.now()
       });
 

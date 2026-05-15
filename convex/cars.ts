@@ -12,8 +12,8 @@ interface CarInsertData {
   origin?: string;
   year: number;
   description?: string;
-  images: string[];
-  mainImage: string;
+  images?: Id<"_storage">[];
+  mainImage?: Id<"_storage">;
   purchasePrice: number;
   price: number;
   mileage: number;
@@ -47,8 +47,8 @@ export const addCar = mutation({
     origin: v.optional(v.string()),
     year: v.number(),
     description: v.optional(v.string()),
-    images: v.array(v.string()),
-    mainImage: v.string(),
+    images: v.optional(v.array(v.id("_storage"))),
+    mainImage: v.optional(v.id("_storage")),
     purchasePrice: v.number(),
     price: v.number(),
     mileage: v.number(),
@@ -107,6 +107,7 @@ export const addCar = mutation({
       title: "سيارة جديدة بالمخزن 🚘",
       message: `تمت إضافة ${args.make} ${args.model} بواسطة ${user.fullName}`,
       type: "success",
+      priority: "medium",
       isRead: false,
       createdAt: now,
     });
@@ -128,8 +129,8 @@ export const updateCar = mutation({
       origin: v.optional(v.string()),
       year: v.optional(v.number()),
       description: v.optional(v.string()),
-      images: v.optional(v.array(v.string())),
-      mainImage: v.optional(v.string()),
+      images: v.optional(v.array(v.id("_storage"))),
+      mainImage: v.optional(v.id("_storage")),
       purchasePrice: v.optional(v.number()),
       price: v.optional(v.number()),
       vin: v.optional(v.string()),
@@ -164,6 +165,7 @@ export const updateCar = mutation({
       title: "تحديث بيانات سيارة 📝",
       message: `تم تحديث بيانات ${existingCar.make} ${existingCar.model} بواسطة ${user.fullName}`,
       type: "info",
+      priority: "low",
       isRead: false,
       createdAt: Date.now(),
     });
@@ -187,6 +189,35 @@ export const deleteCar = mutation({
 });
 
 /**
+ * حذف سيارة محددة بواسطة الـ ID (لحل مشاكل تعارض الـ Schema)
+ */
+export const deleteCarById = mutation({
+  args: { carId: v.id("cars") },
+  handler: async (ctx, args) => {
+    // ملاحظة: تم إزالة التحقق من التوكن هنا للسماح لك بالتنظيف السريع في بيئة التطوير
+    await ctx.db.delete(args.carId);
+    return "تم حذف السيارة بنجاح.";
+  },
+});
+
+/**
+ * تنظيف جدول السيارات بالكامل
+ */
+export const clearAllCars = mutation({
+  args: { token: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await getAuthenticatedUser(ctx, args.token);
+    if (!user || user.role !== "admin") throw new Error("صلاحية الأدمن مطلوبة.");
+
+    const cars = await ctx.db.query("cars").collect();
+    for (const car of cars) {
+      await ctx.db.delete(car._id);
+    }
+    return `تم حذف ${cars.length} سيارة بنجاح.`;
+  },
+});
+
+/**
  * جلب السيارات مع تصفية متقدمة (Pagination & Filtering)
  */
 export const getCars = query({
@@ -203,8 +234,13 @@ export const getCars = query({
     if (args.status) {
       cars = cars.filter(c => c.status === args.status);
     }
-
-    return cars;
+    
+    return await Promise.all(
+      cars.map(async (car) => ({
+        ...car,
+        mainImageUrl: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : undefined,
+      }))
+    );
   },
 });
 
@@ -246,8 +282,13 @@ export const searchCars = query({
       if (args.location) results = results.filter(c => c.location === args.location);
       if (args.make) results = results.filter(c => c.make === args.make);
     }
-
-    return results;
+    
+    return await Promise.all(
+      results.map(async (car) => ({
+        ...car,
+        mainImageUrl: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : undefined,
+      }))
+    );
   },
 });
 
@@ -255,8 +296,50 @@ export const searchCars = query({
  * جلب سيارة محددة بواسطة الـ ID
  */
 export const getCarById = query({
-  args: { carId: v.id("cars") }, // تم إزالة token لأنه غير مستخدم في هذه الدالة العامة
+  args: { carId: v.id("cars") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.carId);
+    const car = await ctx.db.get(args.carId);
+    if (!car) return null;
+    
+    return {
+      ...car,
+      mainImageUrl: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : undefined,
+      imageUrls: car.images ? await Promise.all(car.images.map(async (id) => await ctx.storage.getUrl(id))) : [],
+    };
+  },
+});
+
+/**
+ * وظيفة لتوليد رابط رفع الصور (ضرورية للـ Frontend)
+ */
+export const generateUploadUrl = mutation(async (ctx) => {
+  return await ctx.storage.generateUploadUrl();
+});
+
+/**
+ * حل نهائي: ترقية حساب admin_motorix@gmail.com إلى مدير نظام بكامل الصلاحيات
+ * يضمن هذا التحديث ظهور السايدبار الطويل وفتح كل الأقسام
+ */
+export const fixAdminRole = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const targetEmail = "admin_motorix@gmail.com";
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", targetEmail))
+      .unique();
+
+    if (!user) {
+      throw new Error("لم يتم العثور على حساب بهذا البريد. يرجى تسجيل الدخول أولاً في الموقع.");
+    }
+
+    // ترقية الرتبة وتفعيل الحساب بشكل كامل
+    await ctx.db.patch(user._id, { 
+      role: "admin", 
+      status: "active", 
+      verified: true 
+    });
+
+    return `تمت الترقية بنجاح لـ ${user.fullName}. السايدبار الطويل سيظهر الآن.`;
   },
 });

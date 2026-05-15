@@ -67,7 +67,7 @@ const LandingPage = () => {
     
     try {
       await reserveCar({ token, carId });
-      toast.success("تم إرسال طلب الحجز بنجاح! سيتصل بك الفريق قريباً.");
+      toast.success("رائع! تم تسجيل طلب حجزك. تفقد حسابك لمتابعة التحديثات.");
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء الحجز.");
     }

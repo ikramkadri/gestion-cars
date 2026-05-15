@@ -10,6 +10,7 @@ import { getAuthenticatedUser } from "./auth";
 export const createSale = mutation({
   args: { 
     carId: v.id("cars"), 
+    bookingId: v.optional(v.id("bookings")), // إضافة الحقل المفقود في الـ Validator
     customerName: v.string(), 
     phone: v.string(), 
     address: v.optional(v.string()),
@@ -69,12 +70,17 @@ export const createSale = mutation({
 
     await ctx.db.patch(args.carId, { status: "Sold", updatedAt: now });
 
-    // البحث عن حجز معلق لهذه السيارة وتأكيده آلياً
-    const pendingBooking = await ctx.db
-      .query("bookings")
-      .withIndex("by_car", (q) => q.eq("carId", args.carId))
-      .filter((q) => q.eq(q.field("status"), "pending"))
-      .unique();
+    // تحديد الحجز المراد تأكيده: نستخدم المعرف المباشر إذا توفر، أو نبحث عن أول حجز معلق
+    let pendingBooking;
+    if (args.bookingId) {
+      pendingBooking = await ctx.db.get(args.bookingId);
+    } else {
+      pendingBooking = await ctx.db
+        .query("bookings")
+        .withIndex("by_car", (q) => q.eq("carId", args.carId))
+        .filter((q) => q.eq(q.field("status"), "pending"))
+        .first(); // استخدام first بدلاً من unique لتجنب الانهيار في حال وجود عدة طلبات
+    }
 
     if (pendingBooking) {
       await ctx.db.patch(pendingBooking._id, { status: "confirmed", updatedAt: now });
@@ -85,8 +91,9 @@ export const createSale = mutation({
         title: "تم تأكيد طلبك 🎉",
         message: `مبارك! تم تأكيد شرائك لسيارة ${car.make} ${car.model}. شكراً لثقتك بنا.`,
         type: "success",
+        priority: "high",
         isRead: false,
-        link: "/admin/bookings",
+        actionUrl: "/my-bookings", // توحيد الحقل
         createdAt: now,
       });
     }
@@ -94,6 +101,7 @@ export const createSale = mutation({
     const saleId = await ctx.db.insert("sales", {
       invoiceNumber,
       carId: args.carId,
+      bookingId: args.bookingId || pendingBooking?._id, // حفظ رابط الحجز في سجل البيع
       customerId: customerId, // الآن TypeScript متأكد أن المعرف متاح
       userId: pendingBooking?.userId, // ربط الفاتورة بالمستخدم صاحب الحجز
       sellerId: user._id, 
@@ -110,7 +118,7 @@ export const createSale = mutation({
       updatedAt: now,
     });
 
-    await ctx.db.insert("notifications", { title: "بيع ناجح ✅", message: `تم بيع ${car.make} لـ ${args.customerName}`, type: "success", isRead: false, createdAt: now });
+    await ctx.db.insert("notifications", { title: "بيع ناجح ✅", message: `تم بيع ${car.make} لـ ${args.customerName}`, type: "success", priority: "medium", isRead: false, createdAt: now });
     await ctx.db.insert("activity_logs", { action: "SALE_CREATED", details: `فاتورة ${invoiceNumber}`, userId: user._id, timestamp: now });
 
     return saleId;

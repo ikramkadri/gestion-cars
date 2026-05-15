@@ -23,26 +23,40 @@ export const storeUser = mutation({
     const now = Date.now();
     
     // التحقق من الإيميل الخاص بالأدمن للترقية التلقائية (اختياري)
-    const isAdminEmail = user.email === "admin_motorix@gmail.com";
+    const isAdminEmail = user.email === "your-email@example.com"; // ضع إيميلك هنا
     const finalRole = isAdminEmail ? "admin" : (user.role || "viewer");
     
-    // إذا كان مستخدماً جديداً (لا يملك حالة)، نضعه في وضع الانتظار
+    // جعل حالة الزبون الجديد "معلق" حتى يقبله الأدمن
     const currentStatus = user.status || (isAdminEmail ? "active" : "pending");
+    // تحديد حالة التحقق: الأدمن موثق تلقائياً، والزبون الجديد يبدأ كـ unverified
+    const verifiedStatus = user.verified ?? (isAdminEmail ? true : false);
 
     await ctx.db.patch(user._id, {
       role: finalRole, 
       status: currentStatus,
+      verified: verifiedStatus,
       lastLogin: now,
       updatedAt: now,
     });
 
-    // إرسال إشعار للأدمن عند وجود مستخدم جديد ينتظر المراجعة
+    // إرسال إشعار للأدمن عند انضمام مستخدم جديد
     if (!user.status && !isAdminEmail) {
       await ctx.db.insert("notifications", {
-        title: "مستخدم جديد ينتظر المراجعة 👤",
-        message: `سجل ${user.fullName} حساباً جديداً وهو بانتظار التفعيل.`,
+        title: "مستخدم جديد انضم إلينا ✨",
+        message: `سجل ${user.fullName} حساباً جديداً في المنصة.`,
+        type: "system",
+        priority: "low",
+        isRead: false,
+        createdAt: now,
+      });
+
+      // إرسال إشعار ترحيبي فوري للمستخدم الجديد (الزائر)
+      await ctx.db.insert("notifications", {
+        userId: user._id,
+        title: "أهلاً بك في MOTORIX! 👋",
+        message: `مرحباً ${user.fullName}، تم إنشاء حسابك بنجاح. حسابك الآن قيد المراجعة، سنقوم بتفعيله قريباً لتتمكن من إتمام حجوزاتك.`,
         type: "info",
-        priority: "medium",
+        priority: "low",
         isRead: false,
         createdAt: now,
       });

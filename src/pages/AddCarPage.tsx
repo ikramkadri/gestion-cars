@@ -35,7 +35,7 @@ export default function AddCarPage() {
         drivetrain: formData.drivetrain,
         condition: formData.condition,
         images: formData.images || [],
-        mainImage: formData.mainImage || null, // يمكن أن يكون null
+        mainImage: formData.mainImage || undefined,
         vin: formData.vin, // الحقل القانوني المهم
         description: formData.description,
         color: formData.color,

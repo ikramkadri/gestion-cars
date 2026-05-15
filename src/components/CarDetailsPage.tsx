@@ -10,49 +10,25 @@ import CarDetailsContent from './CarDetailsContent';
 const CarDetailsPage = () => {
   const { carId } = useParams();
   const navigate = useNavigate();
-  const rawCar = useQuery(api.cars.getCarById, carId ? { carId: carId as Id<"cars"> } : "skip");
   
-  // تحديد ما إذا كانت الصورة الرئيسية هي رابط مباشر (URL) أم معرف تخزين (storageId)
-  const isMainImageDirectUrl = rawCar?.mainImage && typeof rawCar.mainImage === 'string' && rawCar.mainImage.startsWith('/');
-
-  // جلب رابط الصورة الفعلية من Convex Storage فقط إذا كانت storageId
-  const fetchedMainImageUrl = useQuery(
-    api.files.getImageUrl,
-    rawCar?.mainImage && !isMainImageDirectUrl ? { storageId: rawCar.mainImage as Id<"_storage"> } : "skip"
-  );
-
-  // بناء كائن CarType الكامل مع روابط الصور
+  // جلب البيانات - الباك إند يقوم الآن بجلب mainImageUrl و imageUrls تلقائياً
+  const rawCar = useQuery(api.cars.getCarById, carId ? { carId: carId as Id<"cars"> } : "skip");
+  const siteSettings = useQuery(api.site_settings.getSettings);
+  
   const car = useMemo(() => {
-    // حالة: السيارة غير موجودة في قاعدة البيانات
     if (rawCar === null) return null;
+    if (!rawCar) return undefined;
 
-    let finalMainImageUrl: string | undefined;
-    if (isMainImageDirectUrl) {
-      finalMainImageUrl = rawCar.mainImage as string; // إذا كان رابط مباشر، استخدمه كما هو
-    } else if (rawCar?.mainImage && fetchedMainImageUrl !== undefined) { // إذا كان storageId وتم جلب الرابط
-      finalMainImageUrl = fetchedMainImageUrl === null ? undefined : fetchedMainImageUrl; // تحويل null إلى undefined
-    } else if (rawCar?.mainImage === null) {
-      finalMainImageUrl = undefined; // إذا كانت الصورة الرئيسية null
-    } else {
-      // لا يزال قيد التحميل أو rawCar.mainImage غير معرف
-      finalMainImageUrl = undefined;
-    }
-
-    // إذا تم تحميل rawCar وتم حل رابط الصورة الرئيسية (أو لم تكن هناك حاجة له)
-    if (rawCar && (finalMainImageUrl !== undefined || rawCar.mainImage === undefined || rawCar.mainImage === null)) {
+    // نمرر البيانات كما هي من الباك إند مع التأكد من تسمية مصفوفة الصور بشكل صحيح للـ Frontend
+    if (rawCar) {
       return {
         ...rawCar,
-        mainImageUrl: finalMainImageUrl,
-        images: [], 
-        imagesUrls: [],
+        mainImageUrl: rawCar.mainImageUrl,
+        imagesUrls: rawCar.imageUrls || [], // هنا تظهر بقية الصور
       } as CarType;
     }
-
-    // حالة: لا يزال قيد التحميل
     return undefined; 
-  }, [rawCar, fetchedMainImageUrl, isMainImageDirectUrl]);
-
-  const siteSettings = useQuery(api.site_settings.getSettings);
+  }, [rawCar]);
 
   if (car === undefined || siteSettings === undefined) {
     return (
@@ -72,9 +48,15 @@ const CarDetailsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 font-sans selection:bg-blue-500/30" dir="rtl">
+    <div className="min-h-screen bg-[#050505] font-sans selection:bg-blue-500/30 animate-in fade-in duration-700" dir="rtl">
+      {/* تأثير خلفية ضوئي لتحسين المظهر */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full" />
+        <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full" />
+      </div>
+
       {/* Floating Navigation Header */}
-      <div className="fixed top-0 left-0 right-0 z-[100] p-6 md:p-10 pointer-events-none">
+      <div className="fixed top-0 left-0 right-0 z-[110] p-6 md:p-10 pointer-events-none">
         <div className="max-w-[1400px] mx-auto">
           <button 
             onClick={() => navigate(-1)} 

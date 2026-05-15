@@ -1,4 +1,5 @@
 import { mutation } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
 /**
  * تعريف نوع البيانات للسيارات التجريبية لضمان مطابقة الـ Schema
@@ -45,7 +46,11 @@ export const seedCars = mutation({
 
     // دالة مساعدة لرفع صورة إلى Convex Storage
     const uploadImage = async (url: string) => {
-      return await ctx.storage.store(new Blob([await (await fetch(url)).arrayBuffer()], { type: "image/jpeg" }));
+      // تعريف النوع يدوياً لتجنب any وإرضاء الـ Linter
+      const storage = ctx.storage as unknown as { 
+        store: (blob: Blob) => Promise<Id<"_storage">> 
+      };
+      return await storage.store(new Blob([await (await fetch(url)).arrayBuffer()], { type: "image/jpeg" }));
     };
 
     // إنشاء أدمن
@@ -54,6 +59,8 @@ export const seedCars = mutation({
       email: "admin@motorix.com",
       password: "123456",
       role: "admin",
+      status: "active",
+      verified: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });

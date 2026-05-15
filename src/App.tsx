@@ -84,7 +84,7 @@ function AuthenticatedApp() {
     <AdminLayout>
       <Routes>
         <Route index element={
-          user?.role === "admin" ? <Dashboard /> : <Navigate to="/admin/inventory" replace />
+          user?.role === "admin" || user?.role === "sales_manager" ? <Dashboard /> : <Navigate to="/admin/inventory" replace />
         } />
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="inventory/add" element={<AddCarPage />} />

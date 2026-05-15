@@ -9,8 +9,8 @@ export default defineSchema({
     origin: v.optional(v.string()), 
     year: v.number(), 
     description: v.optional(v.string()),
-    images: v.optional(v.array(v.id("_storage"))), // Changed to v.id("_storage")
-    mainImage: v.optional(v.id("_storage")), // Changed to v.id("_storage")
+    images: v.optional(v.array(v.id("_storage"))),
+    mainImage: v.optional(v.id("_storage")),
     sellerId: v.id("users"),        // الحقل كان مفقوداً ويسبب خطأ في cars.ts
     purchasePrice: v.number(), 
     price: v.number(), 
@@ -74,6 +74,7 @@ export default defineSchema({
   sales: defineTable({
     invoiceNumber: v.string(),
     carId: v.id("cars"),
+    bookingId: v.optional(v.id("bookings")), // ربط البيع بالحجز المحدد
     customerId: v.id("customers"),
     userId: v.optional(v.id("users")), // ربط البيع بحساب المستخدم المسجل
     saleDate: v.number(),
@@ -117,8 +118,8 @@ export default defineSchema({
     userId: v.optional(v.id("users")), // معرف المستلم (اختياري للزبائن، فارغ للإدارة)
     title: v.string(),
     message: v.string(),
-    type: v.union(v.literal("info"), v.literal("success"), v.literal("warning"), v.literal("error")),
-    priority: v.union(v.literal("low"), v.literal("medium"), v.literal("high")),
+    type: v.union(v.literal("info"), v.literal("success"), v.literal("warning"), v.literal("error"), v.literal("reservation"), v.literal("system")),
+    priority: v.optional(v.union(v.literal("low"), v.literal("medium"), v.literal("high"))), // جعل حقل الأولوية اختيارياً
     isRead: v.boolean(),
     actionUrl: v.optional(v.string()), // الرابط الذي يوجه إليه الإشعار
     createdAt: v.number(),

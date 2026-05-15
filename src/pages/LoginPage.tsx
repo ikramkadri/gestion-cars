@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAction } from "convex/react"; // تغيير useMutation إلى useAction
 import { api } from "../../convex/_generated/api";
-import { Mail, Lock, Loader2, ArrowLeft, Zap } from "lucide-react"; // ArrowLeft أفضل للـ RTL
+import { Mail, Lock, Loader2, ArrowLeft, Zap, User } from "lucide-react"; // ArrowLeft أفضل للـ RTL
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from 'react-hot-toast';
 
@@ -12,6 +12,7 @@ export default function LoginPage() {
   
   const navigate = useNavigate();
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -24,7 +25,7 @@ export default function LoginPage() {
       const authAction = authenticate; // دائما نستخدم authenticate
       const result = await authAction({ 
         email, 
-        name: email.split('@')[0],
+        name: flow === "signUp" ? fullName : email.split('@')[0],
         password: password 
       });
       
@@ -67,6 +68,22 @@ export default function LoginPage() {
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {flow === "signUp" && (
+            <div>
+              <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 mr-1">الاسم الكامل</label>
+              <div className="relative">
+                <User className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pr-12 pl-4 py-4 outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-bold text-right"
+                  placeholder="الاسم واللقب"
+                />
+              </div>
+            </div>
+          )}
           <div>
             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2 mr-1">البريد الإلكتروني</label>
             <div className="relative">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Gauge, Fuel, Settings, MapPin, Hash, ShieldCheck, Zap, Award, Info,
   Phone, MessageCircle, CalendarCheck, Heart, Share2, User, Star, ChevronLeft
@@ -8,6 +8,7 @@ import { toast } from 'react-hot-toast';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CarDetailsContentProps {
@@ -21,6 +22,8 @@ interface CarDetailsContentProps {
 }
 
 const CarDetailsContent = ({ car, siteSettings }: CarDetailsContentProps) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeImg, setActiveImg] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
   const token = localStorage.getItem("convex_token") || "";
@@ -40,6 +43,26 @@ const CarDetailsContent = ({ car, siteSettings }: CarDetailsContentProps) => {
     { label: 'نظام الدفع', value: car.drivetrain || 'N/A', icon: <Award size={22} />, detail: 'ثبات الطريق' },
     { label: 'الأسطوانات', value: car.cylinders ? `${car.cylinders}V` : 'N/A', icon: <Info size={22} />, detail: 'قوة الدفع' },
   ];
+
+  // حجز تلقائي إذا عاد المستخدم من صفحة الدخول
+  useEffect(() => {
+    if (token && location.state?.pendingCarId === car._id) {
+      const carId = location.state.pendingCarId as Id<"cars">;
+      // تنظيف الحالة لمنع التكرار
+      navigate(location.pathname, { replace: true, state: {} });
+      
+      const autoReserve = async () => {
+        const toastId = toast.loading("جاري معالجة طلب الحجز...");
+        try {
+          await reserveCar({ carId, token });
+          toast.success("رائع! تم تسجيل طلب حجزك بنجاح.", { id: toastId });
+        } catch (error: unknown) {
+          toast.error(error instanceof Error ? error.message : "حدث خطأ", { id: toastId });
+        }
+      };
+      autoReserve();
+    }
+  }, [token, location.state, car._id, navigate, location.pathname, reserveCar]);
 
   return (
     <div className="bg-[#F2F2F2] dark:bg-slate-950 min-h-screen text-slate-900 dark:text-white font-sans overflow-x-hidden transition-colors duration-500" dir="rtl">
@@ -179,8 +202,10 @@ const CarDetailsContent = ({ car, siteSettings }: CarDetailsContentProps) => {
                   <button 
                     onClick={async () => {
                       if (!token) {
-                        toast.error("يرجى تسجيل الدخول لحجز مركبتك");
-                        return;
+                        toast.error("يرجى تسجيل الدخول أولاً");
+                        return navigate('/login', { 
+                          state: { from: location.pathname, pendingCarId: car._id } 
+                        });
                       }
                       
                       if (user?.status !== 'active') {

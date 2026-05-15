@@ -83,7 +83,7 @@ export const updateCustomer = mutation({
       throw new Error("غير مصرح لك بتعديل الزبائن.");
     }
 
-    const { customerId, token, ...updates } = args;
+    const { customerId, ...updates } = args;
     await ctx.db.patch(customerId, {
       ...updates,
       updatedAt: Date.now(),

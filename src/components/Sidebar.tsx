@@ -5,7 +5,7 @@ import {
   Users, BookOpen, FileText, BarChart3, ShieldCheck,
   ShoppingCart,
   ChevronRight, ChevronLeft, UserCheck, Receipt, PlusCircle, Archive, Bell, Search,
-  Trophy
+  ShieldAlert
 } from 'lucide-react';
 import type { Doc } from '../../convex/_generated/dataModel';
 import { useQuery } from 'convex/react';
@@ -28,8 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onSignOut }) => {
   const token = localStorage.getItem("convex_token") || "";
 
   // جلب عدد التنبيهات غير المقروءة الحقيقي
-  const unreadNotifs = useQuery(api.notifications.getUnreadNotifications, { token });
-  const unreadCount = unreadNotifs?.length || 0;
+  const unreadCount = useQuery(api.notifications.getUnreadCount, { token }) ?? 0;
 
   const settings = useQuery(api.site_settings.getSettings);
   const logoImageUrl = useQuery(
@@ -129,23 +128,14 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onSignOut }) => {
       </nav>
 
       <div className="mt-auto pt-4 border-t border-slate-100 dark:border-white/5">
-        {/* بطاقة الولاء للزبون (Loyalty Card) */}
-        {!isCollapsed && user?.role === 'viewer' && (
-          <div className="mb-6 p-4 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-[2rem] text-white shadow-lg overflow-hidden relative group">
-            <div className="absolute -right-4 -top-4 opacity-10 group-hover:scale-125 transition-transform duration-500">
-              <Trophy size={80} />
-            </div>
-            <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-2">
-                <Trophy size={16} className="text-amber-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-100">عضوية ذهبية</span>
-              </div>
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-xs font-bold text-indigo-100">رصيد النقاط</p>
-                  <p className="text-xl font-black tabular-nums">1,250</p>
-                </div>
-                <button className="bg-white/20 hover:bg-white/30 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] font-black transition-all">استبدال</button>
+        {/* تنبيه حساب غير موثق - الرحلة العالمية */}
+        {!isCollapsed && user && !user.verified && (
+          <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 rounded-2xl animate-in slide-in-from-bottom-2">
+            <div className="flex items-start gap-2 text-amber-700 dark:text-amber-400">
+              <ShieldAlert size={16} className="shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[10px] font-black leading-tight">يرجى توثيق حسابك</p>
+                <p className="text-[9px] font-medium opacity-80">لتتمكن من إتمام عمليات الحجز.</p>
               </div>
             </div>
           </div>

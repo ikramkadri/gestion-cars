@@ -33,10 +33,8 @@ interface BookingWithDetails extends Doc<"bookings"> { // Moved from BookingsPag
 const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => {
   const token = localStorage.getItem("convex_token") || "";
   
-  // جلب السيارات المتاحة فقط للبيع
-  const availableCars = useQuery(api.cars.getCars, { 
-    status: initialData ? "Reserved" : "Available" // If initialData (from booking) is present, show reserved cars
-  });
+  // جلب السيارات (المتاحة والمحجوزة) القابلة للبيع
+  const allCars = useQuery(api.cars.getCars, { includeArchived: false });
   const createSale = useMutation(api.sales.createSale);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,6 +47,13 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
     amountPaid: 0,
     paymentMethod: 'Cash' as "Cash" | "Bank Transfer" | "Check" | "Card",
   });
+
+  // تصفية السيارات لعرض المتاحة والمحجوزة فقط، أو السيارة المحددة في الحجز
+  const displayCars = allCars?.filter(car => 
+    car.status === "Available" || 
+    car.status === "Reserved" || 
+    (initialData && car._id === initialData.carId)
+  );
 
   useEffect(() => {
     if (initialData) {
@@ -77,6 +82,7 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
         carId: formData.carId as Id<"cars">, // Cast to Id<"cars">
         address: formData.address || undefined,
         identityNum: formData.identityNum || undefined,
+        bookingId: initialData?._id, // إرسال المعرف لفك الالتباس في السيرفر
         token,
       });
       toast.success("تمت عملية البيع وإصدار الفاتورة بنجاح");
@@ -89,7 +95,7 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
     }
   };
 
-  const selectedCar = availableCars?.find((c) => c._id === formData.carId);
+  const selectedCar = allCars?.find((c) => c._id === formData.carId);
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
@@ -122,7 +128,7 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
                 className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all appearance-none"
               >
                 <option value="">-- اختر من المخزون المتاح --</option>
-                {availableCars?.map((car) => (
+                {displayCars?.map((car) => (
                   <option key={car._id} value={car._id}>
                     {car.make} {car.model} ({car.year}) - {car.price.toLocaleString()} دج
                   </option>

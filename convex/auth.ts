@@ -80,6 +80,8 @@ export const registerUserInternal = internalMutation({
       email: args.email,
       password: args.password,
       role: "viewer", // الافتراضي هو مشاهد، والأدمن يتم تعيينه يدوياً عبر Dashboard
+      status: "active",
+      verified: false,
       createdAt: now,
       updatedAt: now,
     });

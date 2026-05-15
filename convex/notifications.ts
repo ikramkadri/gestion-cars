@@ -1,37 +1,54 @@
-import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
 import { getAuthenticatedUser } from "./auth";
 
 /**
- * جلب الإشعارات غير المقروءة فقط (للتنبيهات السريعة)
+ * جلب عدد الإشعارات غير المقروءة للمستخدم الحالي أو الإشعارات العامة
+ */
+export const getUnreadCount = query({
+  args: { token: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const unread = await ctx.db
+      .query("notifications")
+      .withIndex("by_read_status", (q) => q.eq("isRead", false))
+      .collect();
+
+    if (args.token && args.token !== "") {
+      const user = await getAuthenticatedUser(ctx, args.token);
+      if (user) {
+        const isManager = user.role === "admin" || user.role === "sales_manager";
+        return unread.filter((n) => 
+          n.userId === user._id || (isManager && !n.userId)
+        ).length;
+      }
+    }
+    return 0; // لا يتم عرض إشعارات إذا لم يكن هناك مستخدم مسجل
+  },
+});
+
+/**
+ * جلب التنبيهات غير المقروءة (للمكون العائم NotificationBell)
  */
 export const getUnreadNotifications = query({
   args: { token: v.string() },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) return [];
+    
+    const unread = await ctx.db
+      .query("notifications")
+      .withIndex("by_read_status", (q) => q.eq("isRead", false))
+      .collect();
 
-    const query = ctx.db.query("notifications");
-
-    // إذا كان مديراً، يرى إشعارات النظام العامة (userId غير محدد)
-    if (user.role === "admin" || user.role === "sales_manager") {
-      return await query
-        .filter((q) => q.and(q.eq(q.field("isRead"), false), q.eq(q.field("userId"), undefined)))
-        .order("desc")
-        .take(20);
-    }
-
-    // إذا كان زبوناً، يرى إشعاراته الخاصة فقط
-    return await query
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .filter((q) => q.eq(q.field("isRead"), false))
-      .order("desc")
-      .take(20);
+    const isManager = user.role === "admin" || user.role === "sales_manager";
+    return unread
+      .filter((n) => n.userId === user._id || (isManager && !n.userId))
+      .sort((a, b) => b.createdAt - a.createdAt);
   },
 });
 
 /**
- * جلب كافة الإشعارات (سجل التنبيهات الكامل)
+ * جلب كافة التنبيهات (لصفحة الإشعارات الكاملة)
  */
 export const getAllNotifications = query({
   args: { token: v.string() },
@@ -39,86 +56,75 @@ export const getAllNotifications = query({
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) return [];
 
-    const query = ctx.db.query("notifications");
-
-    // تصفية المحتوى بناءً على الصلاحية (فئة المستخدم)
-    if (user.role === "admin" || user.role === "sales_manager") {
-      return await query
-        .filter((q) => q.eq(q.field("userId"), undefined))
-        .order("desc")
-        .collect();
-    }
-
-    return await query
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .order("desc")
-      .collect();
+    const all = await ctx.db.query("notifications").collect();
+    const isManager = user.role === "admin" || user.role === "sales_manager";
+    return all
+      .filter(n => n.userId === user._id || (isManager && !n.userId))
+      .sort((a, b) => b.createdAt - a.createdAt);
   },
 });
 
 /**
- * تحديد إشعار معين كمقروء
+ * تحديد إشعار كمقروء
  */
 export const markAsRead = mutation({
   args: { token: v.string(), notificationId: v.id("notifications") },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
-    if (!user) throw new Error("غير مصرح");
+    if (!user) throw new Error("Unauthorized");
 
-    const notification = await ctx.db.get(args.notificationId);
-    if (!notification) throw new Error("التنبيه غير موجود");
-
-    // التحقق من الملكية: إما إشعار عام للمدراء أو إشعار خاص للمستخدم
-    const isAdmin = user.role === "admin" || user.role === "sales_manager";
-    const isOwner = notification.userId === user._id;
-
-    if (isOwner || (isAdmin && !notification.userId)) {
+    const notif = await ctx.db.get(args.notificationId);
+    if (notif && (!notif.userId || notif.userId === user._id || user.role === "admin")) {
       await ctx.db.patch(args.notificationId, { isRead: true });
     }
   },
 });
 
 /**
- * تحديد كافة الإشعارات كمقروءة (تجربة مستخدم احترافية)
+ * تحديد الكل كمقروء
  */
 export const markAllAsRead = mutation({
   args: { token: v.string() },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
-    if (!user) throw new Error("غير مصرح");
+    if (!user) throw new Error("Unauthorized");
 
-    const isAdmin = user.role === "admin" || user.role === "sales_manager";
-    
-    let unreadQuery;
-    if (isAdmin) {
-      unreadQuery = ctx.db.query("notifications")
-        .filter((q) => q.and(
-          q.eq(q.field("isRead"), false),
-          q.eq(q.field("userId"), undefined)
-        ));
-    } else {
-      unreadQuery = ctx.db.query("notifications")
-        .withIndex("by_user", (q) => q.eq("userId", user._id))
-        .filter((q) => q.eq(q.field("isRead"), false));
-    }
+    const unread = await ctx.db
+      .query("notifications")
+      .withIndex("by_read_status", (q) => q.eq("isRead", false))
+      .collect();
 
-    const unreadNotifications = await unreadQuery.collect();
+    const isManager = user.role === "admin" || user.role === "sales_manager";
+    for (const notif of unread) {
+      const isMyNotification = notif.userId === user._id;
+      const isManagerNotification = isManager && !notif.userId;
 
-    for (const notification of unreadNotifications) {
-      await ctx.db.patch(notification._id, { isRead: true });
+      if (isMyNotification || isManagerNotification) {
+        await ctx.db.patch(notif._id, { isRead: true });
+      }
     }
   },
 });
 
-/**
- * حذف إشعار معين
- */
 export const deleteNotification = mutation({
   args: { token: v.string(), notificationId: v.id("notifications") },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
-    if (!user || user.role !== "admin") throw new Error("غير مصرح");
-
+    if (!user || user.role !== "admin") throw new Error("Admin access required");
     await ctx.db.delete(args.notificationId);
+  },
+});
+
+export const clearAllNotifications = mutation({
+  args: { token: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await getAuthenticatedUser(ctx, args.token);
+    if (!user || user.role !== "admin") throw new Error("صلاحية الأدمن مطلوبة.");
+
+    const notifs = await ctx.db.query("notifications").collect();
+    for (const n of notifs) {
+      await ctx.db.delete(n._id);
+    }
+    return `تم حذف ${notifs.length} إشعار بنجاح.`;
   },
 });
