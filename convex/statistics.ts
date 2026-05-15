@@ -2,11 +2,17 @@
  * المسار: convex/statistics.ts
  * الوظيفة: تزويد لوحة التحكم بالأرقام المالية، حالة المخزون، وبيانات الرسم البياني للمبيعات الشهرية.
  */
-
 import { query } from "./_generated/server";
+import { v } from "convex/values";
+import { getAuthenticatedUser } from "./auth";
 
 export const getDashboardStats = query({
-  handler: async (ctx) => {
+  args: { token: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const user = await getAuthenticatedUser(ctx, args.token);
+    const isAdmin = user?.role === "admin";
+    const isSales = user?.role === "sales_manager";
+
     // 1. جلب السيارات المتاحة والمباعة باستخدام الفهارس (للأداء العالي)
     const availableCars = await ctx.db
       .query("cars")
@@ -29,26 +35,62 @@ export const getDashboardStats = query({
       .collect();
 
     // 2. جلب جميع عمليات البيع
-    const allSales = await ctx.db.query("sales").collect();
+    // إذا كان مدير مبيعات، نجلب مبيعاته فقط
+    let salesQuery = ctx.db.query("sales");
+    if (isSales) {
+      salesQuery = salesQuery.filter((q) => q.eq(q.field("sellerId"), user?._id));
+    }
+    const allSales = await salesQuery.collect();
+
+    // جلب كافة المصاريف العامة (Operational Expenses)
+    const allExpenses = await ctx.db.query("expenses").collect();
+    const totalOperationalExpenses = allExpenses.reduce((sum, e) => sum + e.amount, 0);
 
     // 3. الحسابات المالية الأساسية
     const totalRevenue = allSales.reduce((sum, s) => sum + (s.amountPaid || 0), 0);
     
-    // جلب بيانات السيارات المرتبطة بالمبيعات لحساب الأرباح
-    const soldCarIds = allSales.map(s => s.carId);
-    const soldCarsData = await Promise.all(
-      soldCarIds.map(id => ctx.db.get(id))
-    );
-    
     let totalProfit = 0;
-    allSales.forEach((sale, index) => {
-      const car = soldCarsData[index];
-      if (car && typeof car.purchasePrice === "number") {
-        totalProfit += (sale.amountPaid - car.purchasePrice);
+    let sumDaysToSell = 0;
+    const brandMap = new Map<string, number>();
+    const sellersMap = new Map<string, { name: string, total: number, count: number }>();
+
+    // الأدمن فقط يرى صافي الأرباح
+    if (isAdmin) {
+      for (const sale of allSales) {
+        const car = await ctx.db.get(sale.carId);
+        const seller = await ctx.db.get(sale.sellerId);
+        
+        if (car) {
+          // 1. حساب الربح (سعر البيع - سعر الشراء)
+          totalProfit += (sale.amountPaid - (car.purchasePrice || 0));
+          
+          // 2. حساب أيام البيع (تاريخ البيع - تاريخ الإضافة للمخزن)
+          const days = Math.floor((sale.saleDate - car.createdAt) / (1000 * 60 * 60 * 24));
+          sumDaysToSell += Math.max(0, days);
+
+          // 3. توزيع العلامات التجارية
+          brandMap.set(car.make, (brandMap.get(car.make) || 0) + 1);
+        }
+
+        if (seller) {
+          const sData = sellersMap.get(seller._id) || { name: seller.fullName, total: 0, count: 0 };
+          sData.total += sale.amountPaid;
+          sData.count += 1;
+          sellersMap.set(seller._id, sData);
+        }
       }
-    });
+    }
 
     const stockValue = availableCars.reduce((sum, c) => sum + (c.purchasePrice || 0), 0);
+    const averageDaysToSell = allSales.length > 0 ? Math.round(sumDaysToSell / allSales.length) : 0;
+
+    // حساب معدل التحويل (المبيعات مقسومة على إجمالي الحجوزات + المبيعات)
+    const totalRequests = pendingBookings.length + allSales.length;
+    const conversionRate = totalRequests > 0 ? Math.round((allSales.length / totalRequests) * 100) : 0;
+
+    // تحويل خرائط البيانات إلى مصفوفات للواجهة
+    const brandDistribution = Array.from(brandMap.entries()).map(([name, value]) => ({ name, value }));
+    const leaderboard = Array.from(sellersMap.values()).sort((a, b) => b.total - a.total);
 
     // 4. إعداد بيانات الرسم البياني (المبيعات الشهرية)
     // سنقوم بإنشاء خريطة (Map) لتجميع المبيعات حسب "السنة-الشهر"
@@ -85,14 +127,19 @@ export const getDashboardStats = query({
         available: availableCars.length, 
         sold: soldCars.length, 
         total: availableCars.length + soldCars.length,
-        reserved: pendingBookings.length
+        reserved: pendingBookings.length,
+        averageDaysToSell
       },
       financials: { 
         totalRevenue, 
         totalProfit, 
-        stockValue 
+        expenses: totalOperationalExpenses,
+        stockValue,
+        conversionRate
       },
       chartData, // هذه البيانات تذهب مباشرة للرسم البياني
+      brandDistribution,
+      leaderboard,
       lastUpdate: Date.now()
     };
   },

@@ -1,14 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-// استخدام الاستيرادات المطلوبة مع العلم أنها قد تسبب خطأ في المعاينة الفورية 
-// ولكنها ضرورية لبيئتك المحلية (Local Environment)
+import { useNavigate } from 'react-router-dom'; 
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { api } from "../../convex/_generated/api"; // Removed unused imports
 import { 
   Car, 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
+  DollarSign,
   Plus, 
   Search, 
   Clock,
@@ -19,39 +15,9 @@ import {
   Edit3
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { Id } from "../../convex/_generated/dataModel";
-import { CarType } from '../features/cars/types/car.types';
-
-interface StatCardProps {
-  icon: React.ElementType;
-  color: string;
-  label: string;
-  value: string | number;
-  trend?: string;
-  isUp?: boolean;
-}
-
-const StatCard = ({ icon: Icon, color, label, value, trend, isUp }: StatCardProps) => (
-  <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col gap-4 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300">
-    <div className="flex items-center justify-between">
-      <div className={`${color} p-4 rounded-2xl text-white shadow-lg shadow-current/20`}>
-        <Icon size={24} />
-      </div>
-      {trend && (
-        <div className={`flex items-center gap-1 text-xs font-black ${isUp ? 'text-emerald-500' : 'text-rose-500'} bg-slate-50 px-3 py-1.5 rounded-full`}>
-          {isUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-          {trend}
-        </div>
-      )}
-    </div>
-    <div>
-      <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">{label}</p>
-      <h3 className="text-2xl font-black text-slate-900 mt-1 tabular-nums">
-        {value}
-      </h3>
-    </div>
-  </div>
-);
+import { Id } from "../../convex/_generated/dataModel"; // Keep Id import
+import { CarType } from '../features/cars/types/car.types'; // Keep CarType import
+import StatsCard from '../components/StatsCard'; // استيراد مكون بطاقة الإحصائيات الموحد
 
 const InventoryPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -62,7 +28,7 @@ const InventoryPage = () => {
 
   // جلب البيانات من الباك اند (Convex)
   const cars = useQuery(api.cars.getCars, { includeArchived: false });
-  const stats = useQuery(api.statistics.getDashboardStats);
+  const stats = useQuery(api.statistics.getDashboardStats, { token });
   const removeCar = useMutation(api.cars.deleteCar);
 
   // تصفية البيانات بناءً على البحث
@@ -76,7 +42,7 @@ const InventoryPage = () => {
       const toastId = toast.loading("جاري حذف السيارة وصورها...");
       try {
         const token = localStorage.getItem("convex_token") || "";
-        await removeCar({ carId: id, token });
+        await removeCar({ carId: id, token: token }); // Ensure token is passed
         toast.success("تم حذف السيارة بنجاح", { id: toastId });
       } catch (error) {
         console.error("خطأ أثناء الحذف:", error);
@@ -122,31 +88,37 @@ const InventoryPage = () => {
 
       {/* الإحصائيات */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <StatCard 
+        <StatsCard 
           icon={Car} 
-          color="bg-slate-900" 
+          bg="bg-slate-900" 
+          color="bg-slate-900"
           label="إجمالي الأسطول" 
-          value={stats?.inventory.total ?? "..."}
-          trend="+12%" 
-          isUp={true} 
+          val={stats?.inventory.total.toString() ?? "..."}
+          unit="سيارة"
         />
-        <StatCard 
+        <StatsCard 
           icon={CheckCircle2} 
-          color="bg-emerald-500" 
+          bg="bg-emerald-500" 
+          color="bg-emerald-500"
           label="متوفر للبيع" 
-          value={stats?.inventory.available ?? "..."} 
+          val={stats?.inventory.available.toString() ?? "..."} 
+          unit="سيارة"
         />
-        <StatCard 
+        <StatsCard 
           icon={DollarSign} 
-          color="bg-blue-600" 
+          bg="bg-blue-600" 
+          color="bg-blue-600"
           label="قيمة المخزون" 
-          value={stats ? `${(stats.financials.stockValue / 1000).toFixed(0)}K` : "..."} 
+          val={stats ? (stats.financials.stockValue / 1000).toFixed(0) : "..."} 
+          unit="K"
         />
-        <StatCard 
+        <StatsCard 
           icon={Clock} 
-          color="bg-amber-500" 
+          bg="bg-amber-500" 
+          color="bg-amber-500"
           label="قيد الانتظار" 
-          value={stats?.inventory.reserved ?? "..."} 
+          val={stats?.inventory.reserved.toString() ?? "..."} 
+          unit="سيارة"
         />
       </div>
 
@@ -175,9 +147,12 @@ const InventoryPage = () => {
             <tbody className="divide-y divide-slate-50">
               {filteredCars.map((car: CarType) => (
                 <tr key={car._id} className="hover:bg-slate-50/80 transition-all group">
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-10 rounded-lg bg-slate-100 overflow-hidden">
+                  <td 
+                    className="px-8 py-5 cursor-pointer"
+                    onClick={() => navigate(`/admin/inventory/${car._id}`)}
+                  >
+                    <div className="flex items-center gap-4 group/item">
+                      <div className="w-14 h-10 rounded-lg bg-slate-100 overflow-hidden border border-transparent group-hover/item:border-indigo-500 transition-all">
                         <img 
                           src={car.mainImageUrl || "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=150"} 
                           className="w-full h-full object-cover"
@@ -185,7 +160,7 @@ const InventoryPage = () => {
                         />
                       </div>
                       <div>
-                        <div className="font-black text-slate-900">{car.make} {car.model}</div>
+                        <div className="font-black text-slate-900 group-hover/item:text-indigo-600 transition-colors">{car.make} {car.model}</div>
                       </div>
                     </div>
                   </td>
@@ -202,14 +177,26 @@ const InventoryPage = () => {
                     <span className={`px-3 py-1 rounded-lg text-[10px] font-black ${
                       car.status === "Available" 
                       ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                      : car.status === "Reserved"
+                      ? 'bg-amber-50 text-amber-600 border border-amber-100'
                       : 'bg-rose-50 text-rose-600 border border-rose-100'
                     }`}>
-                      {car.status === "Available" ? "متاح" : "مباع"}
+                      {car.status === "Available" ? "متاح" : (car.status as string) === "Reserved" ? "محجوز" : "مباع"}
                     </span>
                   </td>
                   {user?.role !== "viewer" && (
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-2 justify-end">
+                        {(user?.role === "admin" || user?.role === "sales_manager") && 
+                         (car.status === "Available" || (car.status as string) === "Reserved") && (
+                          <button 
+                            onClick={() => navigate(`/admin/sales/create?carId=${car._id}`)}
+                            className="p-2 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg text-slate-300 transition-all"
+                            title="إتمام عملية البيع"
+                          >
+                            <DollarSign size={16} />
+                          </button>
+                        )}
                         {(user?.role === "admin" || user?.role === "sales_manager") && (
                           <button 
                             onClick={() => navigate(`/admin/inventory/edit/${car._id}`)}

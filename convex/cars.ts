@@ -12,11 +12,12 @@ interface CarInsertData {
   origin?: string;
   year: number;
   description?: string;
-  images: Id<"_storage">[]; // تم التغيير لتخزين معرفات التخزين
-  mainImage: Id<"_storage">; // تم التغيير لتخزين معرف التخزين الرئيسي
+  images: string[];
+  mainImage: string;
   purchasePrice: number;
   price: number;
   mileage: number;
+  vin?: string;
   sellerId: Id<"users">;
   slug: string;
   location: string;
@@ -29,7 +30,7 @@ interface CarInsertData {
   color?: string; 
   condition: "New" | "Excellent" | "Good" | "Fair" | "Poor"; 
   viewCount: number;
-  status: "Available" | "Sold"; 
+  status: "Available" | "Sold" | "Reserved"; 
   isArchived: boolean;
   createdAt: number;
   updatedAt: number;
@@ -46,11 +47,12 @@ export const addCar = mutation({
     origin: v.optional(v.string()),
     year: v.number(),
     description: v.optional(v.string()),
-    images: v.array(v.id("_storage")), // تم التغيير لتخزين معرفات التخزين
-    mainImage: v.id("_storage"), // تم التغيير لتخزين معرف التخزين الرئيسي
+    images: v.array(v.string()),
+    mainImage: v.string(),
     purchasePrice: v.number(),
     price: v.number(),
     mileage: v.number(),
+    vin: v.optional(v.string()),
     location: v.string(),
     hasWarranty: v.boolean(),
     cylinders: v.optional(v.number()),
@@ -80,6 +82,7 @@ export const addCar = mutation({
       purchasePrice: args.purchasePrice,
       price: args.price,
       mileage: args.mileage,
+      vin: args.vin,
       location: args.location,
       sellerId: user._id,
       slug: slug,
@@ -119,15 +122,50 @@ export const updateCar = mutation({
   args: {
     token: v.string(),
     carId: v.id("cars"),
-    updates: v.any(), // يمكن تخصيصها لاحقاً لتدقيق الحقول
+    updates: v.object({ // تحديد الحقول القابلة للتحديث بشكل صريح
+      make: v.optional(v.string()),
+      model: v.optional(v.string()),
+      origin: v.optional(v.string()),
+      year: v.optional(v.number()),
+      description: v.optional(v.string()),
+      images: v.optional(v.array(v.string())),
+      mainImage: v.optional(v.string()),
+      purchasePrice: v.optional(v.number()),
+      price: v.optional(v.number()),
+      vin: v.optional(v.string()),
+      mileage: v.optional(v.number()),
+      location: v.optional(v.string()),
+      hasWarranty: v.optional(v.boolean()),
+      cylinders: v.optional(v.number()),
+      fuel: v.optional(v.union(v.literal("Gasoline"), v.literal("Diesel"), v.literal("Electric"), v.literal("Hybrid"))),
+      transmission: v.optional(v.union(v.literal("Automatic"), v.literal("Manual"))),
+      drivetrain: v.optional(v.union(v.literal("FWD"), v.literal("RWD"), v.literal("AWD"), v.literal("4WD"))),
+      engineSize: v.optional(v.string()),
+      color: v.optional(v.string()),
+      condition: v.optional(v.union(v.literal("New"), v.literal("Excellent"), v.literal("Good"), v.literal("Fair"), v.literal("Poor"))),
+      status: v.optional(v.union(v.literal("Available"), v.literal("Sold"), v.literal("Reserved"))),
+      isArchived: v.optional(v.boolean()),
+      archivedAt: v.optional(v.number()),
+    }),
   },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
-    if (!user || user.role === "viewer") throw new Error("غير مصرح لك");
+    if (!user || (user.role !== "admin" && user.role !== "sales_manager")) throw new Error("غير مصرح لك بتعديل السيارات");
+
+    const existingCar = await ctx.db.get(args.carId);
+    if (!existingCar) throw new Error("السيارة غير موجودة.");
 
     await ctx.db.patch(args.carId, {
       ...args.updates,
       updatedAt: Date.now(),
+    });
+
+    await ctx.db.insert("notifications", {
+      title: "تحديث بيانات سيارة 📝",
+      message: `تم تحديث بيانات ${existingCar.make} ${existingCar.model} بواسطة ${user.fullName}`,
+      type: "info",
+      isRead: false,
+      createdAt: Date.now(),
     });
   },
 });
@@ -143,22 +181,6 @@ export const deleteCar = mutation({
 
     const car = await ctx.db.get(args.carId);
     if (car) {
-      // جمع كافة المعرفات في Set لضمان عدم تكرار الحذف لنفس الملف (mainImage غالباً موجود في images)
-      const storageIdsToDelete = new Set<Id<"_storage">>(car.images);
-      if (car.mainImage) {
-        storageIdsToDelete.add(car.mainImage);
-      }
-      
-      const deletePromises = Array.from(storageIdsToDelete).map(async (imgId) => {
-        try {
-          await ctx.storage.delete(imgId);
-        } catch (error) {
-          // نتجاهل الخطأ إذا كان الملف غير موجود بالفعل لتجنب تعطل عملية الحذف
-          console.warn(`File with storage ID ${imgId} not found, skipping.`);
-        }
-      });
-      
-      await Promise.all(deletePromises);
       await ctx.db.delete(args.carId);
     }
   },
@@ -170,27 +192,19 @@ export const deleteCar = mutation({
 export const getCars = query({
   args: { 
     includeArchived: v.optional(v.boolean()),
-    status: v.optional(v.union(v.literal("Available"), v.literal("Sold")))
+    status: v.optional(v.union(v.literal("Available"), v.literal("Sold"), v.literal("Reserved")))
   },
   handler: async (ctx, args) => {
     const carQuery = ctx.db
       .query("cars")
-      .withIndex("by_archived", (q) => q.eq("isArchived", args.includeArchived ?? false))
-      .filter(q => args.status ? q.eq(q.field("status"), args.status) : true); // استخدام الفهرس لتصفية الحالة
+      .withIndex("by_archived", (q) => q.eq("isArchived", args.includeArchived ?? false));
 
-    const cars = await carQuery.order("desc").collect();
+    let cars = await carQuery.order("desc").collect();
+    if (args.status) {
+      cars = cars.filter(c => c.status === args.status);
+    }
 
-    return await Promise.all(
-      cars.map(async (car: Doc<"cars">) => {
-        // تحسين الأداء: جلب رابط الصورة الرئيسية فقط للقوائم
-        const mainImageUrl = car.mainImage ? await ctx.storage.getUrl(car.mainImage) : null;
-        return {
-          ...car,
-          mainImageUrl,
-          // لا نحتاج imagesUrls هنا لتسريع التحميل
-        };
-      })
-    );
+    return cars;
   },
 });
 
@@ -201,7 +215,7 @@ export const searchCars = query({
   args: { 
     searchTerm: v.string(), 
     make: v.optional(v.string()),
-    status: v.optional(v.union(v.literal("Available"), v.literal("Sold"))), // إضافة status للفلترة
+    status: v.optional(v.union(v.literal("Available"), v.literal("Sold"), v.literal("Reserved"))), // إضافة status للفلترة
     location: v.optional(v.string()), // إضافة location للفلترة
   }, 
   handler: async (ctx, args) => {
@@ -221,7 +235,7 @@ export const searchCars = query({
         .collect();
     } else {
       // في حال عدم وجود نص بحث، نستخدم الفهارس العادية للفلترة
-      let q = ctx.db.query("cars")
+      const q = ctx.db.query("cars")
         .withIndex("by_status_archived", (dbQ) => 
           dbQ.eq("status", args.status ?? "Available").eq("isArchived", false)
         );
@@ -233,11 +247,7 @@ export const searchCars = query({
       if (args.make) results = results.filter(c => c.make === args.make);
     }
 
-    // تحويل معرفات التخزين إلى روابط URL للنتائج
-    return await Promise.all(results.map(async (car: Doc<"cars">) => {
-      const mainImageUrl = car.mainImage ? await ctx.storage.getUrl(car.mainImage) : null;
-      return { ...car, mainImageUrl };
-    }));
+    return results;
   },
 });
 
@@ -247,32 +257,6 @@ export const searchCars = query({
 export const getCarById = query({
   args: { carId: v.id("cars") }, // تم إزالة token لأنه غير مستخدم في هذه الدالة العامة
   handler: async (ctx, args) => {
-    const car = await ctx.db.get(args.carId);
-    if (!car) return null;
-    
-    // يمكن إضافة فحص صلاحيات هنا إذا كانت تفاصيل السيارة حساسة، لكنها حالياً عامة
-    // const user = await getAuthenticatedUser(ctx, args.token); 
-
-    return {
-      ...car,
-      mainImageUrl: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : null, // تحويل معرف التخزين إلى رابط URL
-      imagesUrls: await Promise.all(
-        car.images.map(async (imgId: Id<"_storage">) => {
-          return imgId ? await ctx.storage.getUrl(imgId) : null; // تحويل معرفات التخزين إلى روابط URL
-        })
-      ),
-    };
-  },
-});
-
-/**
- * توليد رابط رفع الصور
- */
-export const generateUploadUrl = mutation({
-  args: { token: v.optional(v.string()) }, // جعل التوكن اختياري هنا
-  handler: async (ctx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
-    if (!user) throw new Error("يجب تسجيل الدخول لرفع الصور");
-    return await ctx.storage.generateUploadUrl();
+    return await ctx.db.get(args.carId);
   },
 });

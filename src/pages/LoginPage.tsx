@@ -1,13 +1,14 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useAction } from "convex/react"; // تغيير useMutation إلى useAction
 import { api } from "../../convex/_generated/api";
 import { Mail, Lock, Loader2, ArrowLeft, Zap } from "lucide-react"; // ArrowLeft أفضل للـ RTL
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from 'react-hot-toast';
 
 export default function LoginPage() {
   // تعريف الـ Mutations لعمليتي الدخول والتسجيل
   const authenticate = useAction(api.auth.authenticate); // استخدام دالة authenticate الجديدة كـ action
+  const location = useLocation();
   
   const navigate = useNavigate();
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
@@ -30,10 +31,10 @@ export default function LoginPage() {
       if (result?.token) {
         localStorage.setItem("convex_token", result.token);
         toast.success(flow === "signIn" ? "تم تسجيل الدخول بنجاح!" : "تم إنشاء الحساب بنجاح!");
-        // التوجيه للوحة التحكم
-        navigate("/admin");
-        // إذا كنت مضطراً لإعادة التحميل لتحديث الـ Context:
-        // window.location.reload(); 
+        
+        // العودة للصفحة السابقة إذا وجدت، أو الذهاب للوحة التحكم افتراضياً
+        const from = location.state?.from || "/admin";
+        navigate(from, { state: location.state, replace: true });
       }
     } catch (err: unknown) {
       console.error(err);

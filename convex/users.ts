@@ -2,8 +2,7 @@ import { mutation, query, action, internalMutation, internalQuery, MutationCtx, 
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth";
 import { internal } from "./_generated/api";
-import bcrypt from "bcryptjs"; // استيراد bcryptjs
-
+import * as bcrypt from "bcryptjs";
 /**
  * وظيفة مساعدة للحصول على مستخدم قاعدة البيانات الحالي بناءً على هويته من Convex Auth.
  */
@@ -26,17 +25,55 @@ export const storeUser = mutation({
     // التحقق من الإيميل الخاص بالأدمن للترقية التلقائية (اختياري)
     const isAdminEmail = user.email === "admin_motorix@gmail.com";
     const finalRole = isAdminEmail ? "admin" : (user.role || "viewer");
+    
+    // إذا كان مستخدماً جديداً (لا يملك حالة)، نضعه في وضع الانتظار
+    const currentStatus = user.status || (isAdminEmail ? "active" : "pending");
 
-    // تحديث حقول المستخدم.
-    // إذا كان المستخدم أدمن بالفعل، لا نغير رتبته.
-    // إذا لم يكن لديه رتبة، نعطيه رتبة "viewer" افتراضياً.
     await ctx.db.patch(user._id, {
       role: finalRole, 
+      status: currentStatus,
       lastLogin: now,
       updatedAt: now,
     });
 
+    // إرسال إشعار للأدمن عند وجود مستخدم جديد ينتظر المراجعة
+    if (!user.status && !isAdminEmail) {
+      await ctx.db.insert("notifications", {
+        title: "مستخدم جديد ينتظر المراجعة 👤",
+        message: `سجل ${user.fullName} حساباً جديداً وهو بانتظار التفعيل.`,
+        type: "info",
+        priority: "medium",
+        isRead: false,
+        createdAt: now,
+      });
+    }
+
     return user._id;
+  },
+});
+
+/**
+ * تفعيل حساب مستخدم (للأدمن فقط)
+ */
+export const approveUser = mutation({
+  args: { token: v.string(), userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const admin = await getDbUser(ctx, args.token);
+    if (!admin || admin.role !== "admin") throw new Error("غير مصرح لك.");
+
+    const now = Date.now();
+    await ctx.db.patch(args.userId, { status: "active", verified: true, updatedAt: now });
+
+    // إرسال إشعار ترحيبي للزبون بعد التفعيل
+    await ctx.db.insert("notifications", {
+      userId: args.userId,
+      title: "تم تفعيل حسابك بنجاح! 🎉",
+      message: "أهلاً بك في MOTORIX. حسابك الآن نشط بالكامل ويمكنك البدء بحجز سياراتك المفضلة.",
+      type: "success",
+      priority: "high",
+      isRead: false,
+      createdAt: now,
+    });
   },
 });
 

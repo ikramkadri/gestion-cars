@@ -8,12 +8,23 @@ import Dashboard from "./pages/Dashboard";
 import InventoryPage from "./pages/InventoryPage";
 import AddCarPage from "./pages/AddCarPage";
 import EditCarPage from "./pages/EditCarPage";
+import SalesPage from "./pages/SalesPage";
+import CustomersPage from "./pages/CustomersPage";
+import UsersPage from "./pages/UsersPage";
+import BookingsPage from "./pages/BookingsPage";
+import InvoicesPage from "./pages/InvoicesPage";
+import StatisticsPage from "./pages/StatisticsPage";
+import OrdersPage from "./pages/OrdersPage";
+import NotificationsPage from "./pages/NotificationsPage";
+import ArchivedInventoryPage from "./pages/ArchivedInventoryPage";
+import ExpensesPage from "./pages/ExpensesPage";
 import SettingsPage from "./pages/SettingsPage";
 import Navbar from "./components/Navbar";
 import { LanguageProvider } from "./lib/LanguageContext";
 import { Toaster } from 'react-hot-toast';
 import LoadingScreen from "./components/LoadingScreen";
 import { api } from "../convex/_generated/api";
+import CarDetailsPage from "./components/CarDetailsPage";
 
 export default function App() {
   return (
@@ -34,6 +45,9 @@ function AppContent() {
         {/* الصفحة الرئيسية: صفحة الهبوط التي تحتوي على السيارة والتحريك */}
         <Route path="/" element={<><Navbar onOpenAuth={() => navigate("/login")} /><LandingPage /></>} /> 
         
+        {/* مسار عام لرؤية تفاصيل السيارة للجميع */}
+        <Route path="/inventory/:carId" element={<><Navbar onOpenAuth={() => navigate("/login")} /><CarDetailsPage /></>} />
+
         <Route path="/login" element={token ? <Navigate to="/admin" /> : <LoginPage />} />
         
         <Route path="/admin/*" element={token ? <AuthenticatedApp /> : <Navigate to="/login" />} />
@@ -47,15 +61,13 @@ function AppContent() {
 function AuthenticatedApp() {
   const token = localStorage.getItem("convex_token") ?? undefined;
   const storeUser = useMutation(api.users.storeUser);
-  const user = useQuery(api.users.viewer, token ? { token } : "skip"); // Pass token only if it exists, otherwise skip
+  const user = useQuery(api.users.viewer, token ? { token } : "skip");
 
   useEffect(() => {
-    // بمجرد الدخول، نرسل بيانات الإيميل لـ Convex ليتم التحقق منها
-    // استدعاء storeUser فقط إذا كان التوكن موجوداً والمستخدم قد تم تحميله بنجاح (وليس null)
-    if (token && user) { 
+    if (token && user) {
       storeUser({ token });
     }
-  }, [storeUser, token, user]); // إضافة user إلى قائمة التبعيات
+  }, [token, user, storeUser]); 
 
   // انتظر حتى يتم تحميل بيانات المستخدم
   if (user === undefined) {
@@ -77,6 +89,16 @@ function AuthenticatedApp() {
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="inventory/add" element={<AddCarPage />} />
         <Route path="inventory/edit/:carId" element={<EditCarPage />} />
+        <Route path="inventory/archived" element={<ArchivedInventoryPage />} />
+        <Route path="sales" element={<SalesPage />} />
+        <Route path="customers" element={<CustomersPage />} />
+        <Route path="users" element={<UsersPage />} />
+        <Route path="bookings" element={<BookingsPage />} />
+        <Route path="orders" element={<OrdersPage />} />
+        <Route path="notifications" element={<NotificationsPage />} />
+        <Route path="invoices" element={<InvoicesPage />} />
+        <Route path="statistics" element={<StatisticsPage />} />
+        <Route path="expenses" element={<ExpensesPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>

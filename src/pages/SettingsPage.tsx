@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
-import { Lock, Save, ShieldCheck, AlertCircle, Camera, Loader2, User } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Lock, Save, ShieldCheck, AlertCircle, Camera, Loader2, User, Calendar, Clock, Car } from 'lucide-react';
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { BookingWithDetails } from '../types/app'; // Import from types/app
 
 export default function SettingsPage() {
   const token = localStorage.getItem("convex_token") ?? undefined;
@@ -9,8 +10,11 @@ export default function SettingsPage() {
   // جلب بيانات المستخدم الحالي
   const user = useQuery(api.users.viewer, { token });
   
+  // جلب حجوزات المستخدم
+  const myBookings = useQuery(api.bookings.getMyBookings, token ? { token } : "skip");
+
   // Mutations
-  const generateUploadUrl = useMutation(api.cars.generateUploadUrl);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl); // Corrected path
   const updateUser = useMutation(api.users.updateUser);
   const changePassword = useAction(api.users.changePassword); // تغيير useMutation إلى useAction
 
@@ -132,6 +136,68 @@ export default function SettingsPage() {
             {user?.role === 'admin' ? 'مدير النظام' : 'موظف'}
           </span>
         </div>
+      </div>
+
+      {/* قسم حجوزاتي */}
+      <div className="flex items-center gap-4 mb-8">
+        <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-500/20">
+          <Calendar size={28} />
+        </div>
+        <div>
+          <h1 className="text-2xl font-black text-slate-900">حجوزاتي</h1>
+          <p className="text-slate-500 font-medium text-sm">تتبع طلبات حجز السيارات الخاصة بك</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 mb-8">
+        {myBookings === undefined ? (
+          <div className="flex justify-center py-10">
+            <Loader2 className="animate-spin text-blue-600" size={30} />
+          </div>
+        ) : myBookings.length === 0 ? (
+          <p className="text-center text-slate-400 font-bold py-10 italic">ليس لديك أي حجوزات حالياً.</p>
+        ) : (
+          <div className="space-y-4">
+            {myBookings.map((booking: BookingWithDetails) => (
+              <div key={booking._id} className="flex flex-col md:flex-row items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:shadow-md transition-all gap-4">
+                <div className="flex items-center gap-4 w-full md:w-auto">
+                  <div className="w-16 h-12 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm">
+                    <Car size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-900">{booking.car?.make} {booking.car?.model}</h3>
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mt-1">
+                      <Calendar size={14} />
+                      <span>{new Date(booking.bookingDate).toLocaleDateString('ar-DZ')}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
+                   <div className="flex items-center gap-2">
+                      <Clock size={16} className="text-slate-400" />
+                      <span className="text-xs font-bold text-slate-500 tabular-nums">
+                        {new Date(booking.createdAt).toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                   </div>
+                   <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                     booking.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
+                     booking.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                     'bg-rose-100 text-rose-700'
+                   }`}>
+                     {booking.status === 'confirmed' ? 'مؤكد' : booking.status === 'pending' ? 'قيد الانتظار' : booking.status === 'cancelled' ? 'ملغي' : 'مرفوض'}
+                   </span>
+                </div>
+                {booking.status === 'rejected' && booking.rejectionReason && (
+                  <div className="w-full md:w-auto mt-4 md:mt-0 p-3 bg-rose-50 rounded-xl border border-rose-100 text-rose-700 text-xs font-bold text-right">
+                    <p className="font-black mb-1">سبب الرفض:</p>
+                    <p>{booking.rejectionReason}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-4 mb-8">

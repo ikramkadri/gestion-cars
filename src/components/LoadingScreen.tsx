@@ -1,4 +1,4 @@
-import React from 'react';
+import React from 'react'; // Added React import
 import { Loader2 } from 'lucide-react';
 
 const LoadingScreen = () => {

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
-import AddCarForm, { CarFormData } from "./AddCarForm"; // Corrected path to same directory
+import AddCarForm, { CarFormData } from "../components/AddCarForm";
 import { Loader2, ArrowRight } from "lucide-react";
 import { toast } from "react-hot-toast"; // Corrected named import
 
@@ -13,6 +13,7 @@ export default function EditCarPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // جلب بيانات السيارة
+  // جلب بيانات السيارة (CarType)
   const car = useQuery(api.cars.getCarById, { carId: carId as Id<"cars"> });
   const updateCar = useMutation(api.cars.updateCar);
 
@@ -25,7 +26,7 @@ export default function EditCarPage() {
       await updateCar({
         token,
         carId: carId as Id<"cars">,
-        updates: formData,
+        updates: { ...formData, mainImage: formData.mainImage || undefined, images: formData.images || undefined }, // Pass undefined for null/empty optional fields
       });
 
       toast.success("تم تحديث بيانات السيارة بنجاح");
@@ -54,7 +55,16 @@ export default function EditCarPage() {
         <ArrowRight size={20} />
         <span>العودة للمخزن</span>
       </button>
-      <AddCarForm title={`تعديل: ${car.make} ${car.model}`} initialData={car} onSubmit={handleSubmit} isLoading={isSubmitting} />
+      <AddCarForm
+        title={`تعديل: ${car.make} ${car.model}`}
+        initialData={{
+          ...car,
+          mainImage: car.mainImage || null, // Ensure mainImage is Id<"_storage"> | null
+          images: car.images || [], // Ensure images is Id<"_storage">[]
+        }}
+        onSubmit={handleSubmit}
+        isLoading={isSubmitting}
+      />
     </div>
   );
 }

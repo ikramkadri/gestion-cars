@@ -1,13 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  Car, MapPin, CheckCircle2,
-  ChevronLeft, ChevronRight, Image as ImageIcon,
-  Loader2, // تم إضافة Loader2 هنا
+  Car, MapPin, CheckCircle2, AlertTriangle,
+  ChevronLeft, ChevronRight,
+  Loader2, AlertCircle,
   Settings2, Palette,
-  Zap, Info, Trash2, Camera, Plus, MousePointerClick,
-  TrendingUp, TrendingDown, Search, AlertCircle, Pipette, AlertTriangle, X
+  Zap, Info, Trash2, Camera, Plus, MousePointerClick, TrendingUp, TrendingDown, Search, Pipette, X
 } from 'lucide-react';
-import { Id } from '../../convex/_generated/dataModel'; // استيراد Id من Convex
+import { toast } from 'react-hot-toast';
+import { CarType } from '../features/cars/types/car.types';
+import { useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import { Id } from '../../convex/_generated/dataModel';
 
 // --- الثوابت ---
 const CAR_MAKES = ['Toyota', 'Hyundai', 'Volkswagen', 'Renault', 'Peugeot', 'Dacia', 'Kia', 'Mercedes-Benz', 'BMW', 'Audi', 'Ford', 'Nissan', 'Chevrolet', 'Suzuki', 'Mitsubishi', 'Honda', 'Seat', 'Skoda', 'Fiat'];
@@ -57,6 +60,7 @@ export interface CarFormData {
   price: number;
   mileage: number;
   location: string;
+  vin?: string;
   color?: string; // يمكن أن يكون اختياريًا
   condition: CarCondition; // استخدام النوع المحدد
   fuel: "Gasoline" | "Diesel" | "Electric" | "Hybrid";
@@ -65,8 +69,8 @@ export interface CarFormData {
   hasWarranty: boolean;
   cylinders?: number;
   engineSize?: string;
-  mainImage?: Id<"_storage">; // استخدام Id من Convex
-  images?: Id<"_storage">[]; // مصفوفة معرفات الصور
+  mainImage: Id<"_storage"> | null; // يجب أن يكون null إذا لم يتم الرفع
+  images: Id<"_storage">[]; // مصفوفة معرفات الصور
 }
 
 interface AutocompleteInputProps {
@@ -132,32 +136,9 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ label, value, onC
   );
 };
 
-// دالة ضغط الصور لتقليل الحجم قبل الرفع
-const compressImage = async (file: File): Promise<Blob> => {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_WIDTH = 1200; // تقليل العرض الأقصى لسرعة الرفع
-        const scaleSize = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scaleSize;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        // تحويل الصورة إلى JPEG بجودة 70% لتقليل الحجم بشكل كبير
-        canvas.toBlob((blob) => resolve(blob || file), "image/jpeg", 0.7);
-      };
-    };
-  });
-};
-
 // تعريف نوع الصورة للمعاينة والرفع
 interface ImageItem {
-  storageId: Id<"_storage">;
+  storageId: string;
   url: string;
 }
 
@@ -165,19 +146,23 @@ interface AddCarFormProps {
   onSubmit: (data: CarFormData) => void | Promise<void>;
   isLoading: boolean;
   title?: string;
-  initialData?: any;
+  initialData?: CarType;
 }
 
 const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps) => {
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl); // Assuming 'files' module for uploads
+  const [isUploading, setIsUploading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [uploadedImages, setUploadedImages] = useState<ImageItem[]>([]); // استخدام ImageItem بدلاً من string[]
+  const [uploadedImages, setUploadedImages] = useState<ImageItem[]>([]); // استخدام uploadedImages
   const [tempColor, setTempColor] = useState('#FFFFFF');
   const [isColorConfirmed, setIsColorConfirmed] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [formData, setFormData] = useState({
-    make: initialData?.make || '',
+  const [formData, setFormData] = useState<CarFormData>({
+    make: initialData?.make || '', // Fixed computed property name error
     model: initialData?.model || '',
     origin: initialData?.origin || '',
     year: initialData?.year || new Date().getFullYear(),
@@ -186,6 +171,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     price: initialData?.price || 0,
     mileage: initialData?.mileage || 0,
     location: initialData?.location || '',
+    vin: initialData?.vin || '',
     color: initialData?.color || '#FFFFFF',
     condition: initialData?.condition || 'Excellent' as CarCondition, // تحديد النوع الافتراضي
     fuel: initialData?.fuel || 'Gasoline',
@@ -194,19 +180,42 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     hasWarranty: initialData?.hasWarranty || false,
     cylinders: initialData?.cylinders || 4,
     engineSize: initialData?.engineSize || '',
+    mainImage: initialData?.mainImage || null,
+    images: initialData?.images || [],
   }); // استخدام initialData لتهيئة formData
 
+  // تحميل الصور الموجودة واللون في حال التعديل
+  useEffect(() => {
+    if (initialData) {
+      const initialImages: ImageItem[] = [];
+      if (initialData.mainImage && initialData.mainImageUrl) {
+        initialImages.push({ storageId: initialData.mainImage, url: initialData.mainImageUrl });
+      }
+      if (initialData.images && initialData.imagesUrls) {
+        initialData.images.forEach((id, index) => {
+          if (initialData.imagesUrls && initialData.imagesUrls[index]) {
+            initialImages.push({ storageId: id, url: initialData.imagesUrls[index] });
+          }
+        });
+      }
+      setUploadedImages(initialImages);
+      if (initialData.color) {
+        setTempColor(initialData.color);
+        setIsColorConfirmed(true);
+      }
+    }
+  }, [initialData]);
+
   // تحويل completedSteps إلى حالة مشتقة
-  const completedSteps = React.useMemo(() => {
+  const completedSteps = useMemo(() => {
     const steps: number[] = [];
     if (formData.make && formData.model && formData.year) steps.push(1);
     if (isColorConfirmed && formData.condition) steps.push(2);
     if (formData.price > 0 && formData.location && formData.fuel && formData.transmission && formData.drivetrain) steps.push(3); // إضافة تحقق للحقول الجديدة
     if (uploadedImages.length > 0) steps.push(4);
-    return steps;
-  }, [formData, isColorConfirmed, uploadedImages.length]);
-
-
+    return steps; 
+  }, [formData, isColorConfirmed, uploadedImages.length]); // Added dependencies
+  
   const nextStep = () => {
     // التحقق من الخطوة الحالية قبل الانتقال
     const newErrors: Record<string, string> = {};
@@ -230,23 +239,55 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
       return;
     }
 
-    setErrors({});
-    setCurrentStep(prev => prev + 1);
+    setErrors({}); // Clear errors on successful step
+    setCurrentStep((prev: number) => prev + 1); // Use functional update and type prev
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const prevStep = () => {
-    setCurrentStep(prev => prev - 1);
+    setCurrentStep((prev: number) => prev - 1); // Use functional update and type prev
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true); // Correctly using setIsUploading
+    const token = localStorage.getItem("convex_token") || "";
+
+    try {
+      for (const file of Array.from(files)) {
+        const postUrl = await generateUploadUrl({ token });
+        const result = await fetch(postUrl, { method: "POST", body: file });
+        const { storageId } = await result.json();
+
+        if (!formData.mainImage && uploadedImages.length === 0) { // Only set mainImage if it's the first upload
+          setFormData((prev) => ({ ...prev, mainImage: storageId as Id<"_storage"> })); 
+        } else {
+          setFormData((prev) => ({ ...prev, images: [...(prev.images || []), storageId as Id<"_storage">] }));
+        }
+        setUploadedImages((prev: ImageItem[]) => [...prev, { 
+          storageId,
+          url: URL.createObjectURL(file)
+        }]);
+      }
+      toast.success("تم رفع الصور بنجاح");
+    } catch {
+      toast.error("فشل في رفع الصور");
+    } finally {
+      setIsUploading(false); // Ensure loading state is reset
+    }
+  };
+
   const confirmSubmit = () => {
+    // دمج بيانات الصور المرفوعة مع بيانات النموذج قبل الإرسال
     const finalData = {
       ...formData,
-      mainImage: uploadedImages[0]?.storageId,
-      images: uploadedImages.map((img: ImageItem) => img.storageId)
+      mainImage: uploadedImages[0]?.storageId || null, // أول صورة هي الرئيسية إجبارياً
+      images: uploadedImages.slice(1).map(img => img.storageId as Id<"_storage">) // باقي الصور
     };
-    onSubmit(finalData as CarFormData);
+    onSubmit(finalData as CarFormData); 
     setShowConfirmModal(false);
   };
 
@@ -327,12 +368,21 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               </div>
               <AutocompleteInput 
                 label="المنشأ / الوارد" 
-                value={formData.origin} 
+                value={formData.origin || ''} 
                 onChange={(val) => setFormData({...formData, origin: val})} 
                 suggestions={ORIGINS} 
                 placeholder="اختر المنشأ..." 
                 icon={null} // تم إضافة icon: null لجعلها اختيارية
               /> 
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-gray-600 mr-2 block text-right">رقم الهيكل (VIN)</label>
+              <input // Added VIN input
+                value={formData.vin} 
+                onChange={(e) => setFormData({...formData, vin: e.target.value})} 
+                className="w-full p-4 rounded-2xl border-2 border-transparent focus:border-blue-500 focus:bg-white outline-none bg-white shadow-sm transition-all text-right" 
+                placeholder="أدخل رقم الهيكل الاختياري..." 
+              />
             </div>
           </div>
         )}
@@ -344,7 +394,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               <label className="text-md font-black text-gray-800 flex items-center gap-2 mb-6"><Info className="text-blue-500" /> حالة السيارة</label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {CONDITIONS.map((cond) => (
-                  <button key={cond.id} onClick={() => setFormData({...formData, condition: cond.id})} className={`p-4 rounded-3xl flex flex-col items-center gap-3 transition-all border-4 ${formData.condition === cond.id ? 'border-blue-500 bg-white shadow-xl scale-105' : 'border-transparent bg-white/50 opacity-60'}`}>
+                  <button key={cond.id} onClick={() => setFormData({...formData, condition: cond.id as CarCondition})} className={`p-4 rounded-3xl flex flex-col items-center gap-3 transition-all border-4 ${formData.condition === cond.id ? 'border-blue-500 bg-white shadow-xl scale-105' : 'border-transparent bg-white/50 opacity-60'}`}>
                     <span className="text-3xl">{cond.icon}</span>
                     <span className="font-black text-xs text-gray-800">{cond.label}</span>
                     <div className={`w-full h-2 rounded-full ${cond.color}`} />
@@ -535,7 +585,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-blue-100 focus-within:border-blue-500 transition-all">
                 <label className="text-xs font-black text-blue-600 mb-3 block">سعر العرض للبيع</label>
                 <div className="flex items-center gap-3">
-                  <input type="number" value={formData.price || ''} onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent text-blue-700" placeholder="0" />
+                  <input type="number" value={formData.price || ''} onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent text-blue-700 focus:text-indigo-700 transition-colors" placeholder="0" />
                   <span className="font-black text-blue-200">دج</span>
                 </div>
               </div>
@@ -580,9 +630,9 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
              </div>
              
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {uploadedImages.map((_, i) => (
+              {uploadedImages.map((img, i) => (
                 <div key={i} className="aspect-square bg-white rounded-3xl relative flex items-center justify-center text-gray-200 border-2 border-gray-100 shadow-sm overflow-hidden group">
-                  <ImageIcon size={48} />
+                  <img src={img.url} className="w-full h-full object-cover" alt="Car" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <button onClick={() => setUploadedImages(uploadedImages.filter((_, idx) => idx !== i))} className="p-3 bg-red-500 text-white rounded-2xl shadow-xl hover:scale-110 active:scale-95 transition-all">
                         <Trash2 size={20}/>
@@ -590,11 +640,16 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
                   </div>
                 </div>
               ))}
-              <button onClick={() => {}} className="aspect-square border-4 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all group">
+              <input type="file" ref={fileInputRef} className="hidden" multiple accept="image/*" onChange={handleFileChange} />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="aspect-square border-4 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all group disabled:opacity-50"
+              >
                 <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                    <Plus size={24} />
+                    {isUploading ? <Loader2 className="animate-spin" /> : <Plus size={24} />}
                 </div>
-                <span className="text-[10px] font-black uppercase tracking-widest">إضافة صورة</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">{isUploading ? 'جاري الرفع...' : 'إضافة صورة'}</span>
               </button>
             </div>
 
@@ -633,11 +688,11 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
           </button>
         ) : (
           <button 
-            disabled={completedSteps.length < 4} 
-            className={`px-14 py-4 rounded-2xl font-black transition-all shadow-xl flex items-center gap-3 ${completedSteps.length === 4 ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 hover:-translate-y-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed'} ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            disabled={completedSteps.length < 4 || isLoading || isUploading} 
+            className={`px-14 py-4 rounded-2xl font-black transition-all shadow-xl flex items-center gap-3 ${completedSteps.length === 4 && !isUploading ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 hover:-translate-y-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed'} ${(isLoading || isUploading) ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={() => setShowConfirmModal(true)}
           >
-            <Zap size={20}/>
+            {isUploading ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20}/>}
             حفظ ونشر الإعلان
           </button>
         )}

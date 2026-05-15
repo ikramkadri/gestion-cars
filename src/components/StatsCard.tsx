@@ -1,4 +1,3 @@
-import React from 'react';
 import { LucideIcon } from 'lucide-react';
 
 interface StatsCardProps {
@@ -26,6 +25,3 @@ const StatsCard = ({ label, val, unit, icon: Icon, color, bg }: StatsCardProps) 
 );
 
 export default StatsCard;
-
-
-

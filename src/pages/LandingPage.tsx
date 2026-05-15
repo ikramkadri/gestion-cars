@@ -1,75 +1,32 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery } from 'convex/react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../convex/_generated/api';
+import { toast } from 'react-hot-toast';
 import { 
   Search, 
   MapPin, 
   ShieldAlert, 
   Zap, 
   ArrowRight, 
-  ChevronDown, 
-  Rocket, 
-  ShieldCheck, 
-  Users, 
-  MessageSquare, 
-  DollarSign, 
-  Fuel,
-  Gauge,
-  Calendar,
-  Car as CarIcon
+  ChevronDown, Rocket, ShieldCheck, Users
 } from 'lucide-react';
-
-/**
- * مكون بطاقة السيارة المطور المرتبط ببيانات Convex
- */
-const CarCard = ({ car }: { car: any }) => (
-  <div className="bg-white dark:bg-slate-900 rounded-[2rem] overflow-hidden shadow-lg border border-slate-100 dark:border-slate-800 group hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2">
-    <div className="relative h-64 overflow-hidden">
-      <img 
-        src={car.mainImageUrl || "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=150"} 
-        alt={`${car.make} ${car.model}`} 
-        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-      />
-      <div className="absolute top-4 right-4 bg-blue-600 text-white text-xs font-black px-4 py-1.5 rounded-full shadow-lg">
-        {car.condition === 'New' ? 'جديدة' : 'مستعملة'}
-      </div>
-    </div>
-    <div className="p-8 text-right" dir="rtl">
-      <div className="flex justify-between items-start mb-4">
-        <div className="text-right">
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-1">{car.make}</h3>
-          <p className="text-slate-500 font-bold">{car.model} - {car.year}</p>
-        </div>
-        <div className="text-left">
-          <span className="text-2xl font-black text-blue-600">{(car.price || 0).toLocaleString()} <small className="text-xs">دج</small></span>
-        </div>
-      </div>
-      <div className="grid grid-cols-3 gap-2 py-4 border-y border-slate-100 dark:border-slate-800 mb-6">
-        <div className="flex flex-col items-center gap-1">
-          <Fuel size={16} className="text-slate-400" />
-          <span className="text-[10px] font-bold text-slate-500 uppercase">{car.fuel}</span>
-        </div>
-        <div className="flex flex-col items-center gap-1 border-x border-slate-100 dark:border-slate-800">
-          <Gauge size={16} className="text-slate-400" />
-          <span className="text-[10px] font-bold text-slate-500 uppercase">{car.mileage} كم</span>
-        </div>
-        <div className="flex flex-col items-center gap-1">
-          <Calendar size={16} className="text-slate-400" />
-          <span className="text-[10px] font-bold text-slate-500 uppercase">{car.year}</span>
-        </div>
-      </div>
-      <button className="w-full bg-slate-900 dark:bg-white dark:text-slate-950 text-white py-4 rounded-xl font-black text-sm hover:bg-blue-600 hover:text-white transition-all duration-300">
-        عرض التفاصيل
-      </button>
-    </div>
-  </div>
-);
+import { CarType } from '../features/cars/types/car.types';
+import { Id } from '../../convex/_generated/dataModel';
+import CarCard from '../components/CarCard'; // استيراد مكون CarCard العام
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   // جلب إعدادات الموقع
   const settings = useQuery(api.site_settings.getSettings);
+  const logoImageUrl = useQuery(
+    api.files.getImageUrl,
+    settings?.logoImageId ? { storageId: settings.logoImageId as Id<"_storage"> } : "skip"
+  );
+  const reserveCar = useMutation(api.bookings.reserveCar);
+  const token = localStorage.getItem("convex_token") || "";
+  // تم إزالة reservingId لعدم استخدامه في العرض
 
   const [typedText, setTypedText] = useState('');
   const [textIndex, setTextIndex] = useState(0);
@@ -97,10 +54,24 @@ const LandingPage = () => {
   const heroMessages = useMemo(() => {
     return [
       "اعثر على سيارة أحلامك",
-      `سوق السيارات الأول في ${settings?.showroomName || "الجزائر"}`,
-      "بيع واشتري بكل أمان"
+      `معرض السيارات الأول في ${settings?.showroomName || "الجزائر"}`,
+      "احجز سيارتك المفضلة بكل أمان"
     ];
   }, [settings]);
+
+  const handleReserve = useCallback(async (carId: Id<"cars">) => {
+    if (!token) {
+      toast.error("يرجى تسجيل الدخول أولاً");
+      return navigate('/login', { state: { from: location.pathname, pendingCarId: carId } });
+    }
+    
+    try {
+      await reserveCar({ token, carId });
+      toast.success("تم إرسال طلب الحجز بنجاح! سيتصل بك الفريق قريباً.");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء الحجز.");
+    }
+  }, [token, navigate, location.pathname, reserveCar]);
 
   useEffect(() => {
     const handleTyping = () => {
@@ -117,6 +88,16 @@ const LandingPage = () => {
     const timer = setTimeout(handleTyping, isDeleting ? 40 : 80);
     return () => clearTimeout(timer);
   }, [typedText, isDeleting, textIndex, heroMessages]);
+
+  // تنفيذ الحجز التلقائي بعد العودة من صفحة الدخول
+  useEffect(() => {
+    if (token && location.state?.pendingCarId) {
+      const carId = location.state.pendingCarId;
+      // تنظيف الحالة من الرابط لمنع التكرار عند تحديث الصفحة
+      navigate(location.pathname, { replace: true, state: {} });
+      handleReserve(carId);
+    }
+  }, [token, location.state, navigate, location.pathname, handleReserve]);
 
   return (
     <div className="bg-[#050505] dark:bg-slate-950 transition-colors duration-500 min-h-screen font-sans">
@@ -195,7 +176,7 @@ const LandingPage = () => {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mt-16">
             {[
-              { icon: Rocket, title: "سرعة الأداء", description: "اعثر على سيارتك المثالية أو بِع سيارتك في وقت قياسي بفضل نظامنا الفعال." },
+              { icon: Rocket, title: "سرعة الأداء", description: "اعثر على سيارتك المثالية وتصفح أفضل العروض في وقت قياسي بفضل نظامنا الفعال." },
               { icon: ShieldCheck, title: "أمان وموثوقية", description: "نضمن لك تعاملات آمنة وموثوقة، مع حماية كاملة لبياناتك الشخصية ومالك." },
               { icon: Users, title: "دعم مخصص", description: "فريق دعم متاح لمساعدتك في كل خطوة، من البحث وحتى إتمام الصفقة." },
             ].map((feature, index) => (
@@ -217,7 +198,7 @@ const LandingPage = () => {
           <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-6">
             <div className="space-y-2 text-right">
               <h2 className="text-4xl font-black text-slate-900 dark:text-white mb-3">آخر الإعلانات</h2>
-              <p className="text-slate-500 font-bold">اكتشف أحدث السيارات المضافة في سوقنا</p>
+              <p className="text-slate-500 font-bold">اكتشف أحدث السيارات المضافة في معرضنا</p>
             </div>
             <button className="flex items-center gap-2 text-blue-600 font-black group">
               <span>عرض كل العروض</span>
@@ -225,11 +206,10 @@ const LandingPage = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-10">
             {cars?.map((car) => (
-              <CarCard key={car._id} car={car} />
+              <CarCard key={car._id} car={car as CarType} />
             ))}
-            {cars?.length === 0 && <p className="col-span-full text-center text-slate-400 font-bold py-20">لا توجد سيارات معروضة حالياً..</p>}
           </div>
         </div>
       </section>
@@ -240,14 +220,18 @@ const LandingPage = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-12 mb-20 text-right">
             <div>
               <div className="flex items-center gap-2 mb-6">
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <Zap size={24} className="fill-white" />
-                </div>
+                {logoImageUrl ? (
+                  <img src={logoImageUrl} alt="Showroom Logo" className="w-10 h-10 object-contain" />
+                ) : (
+                  <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <Zap size={24} className="fill-white" />
+                  </div>
+                )}
                 <span className="text-2xl font-black tracking-tighter uppercase">
                   {settings?.showroomName?.split(' ')[0] || "MOTOR"}<span className="text-blue-500">{settings?.showroomName?.split(' ')[1] || "IX"}</span>
                 </span>
               </div>
-              <p className="text-slate-500 font-bold max-w-sm">المنصة الرائدة لبيع وشراء السيارات بأمان وثقة.</p>
+              <p className="text-slate-500 font-bold max-w-sm">المنصة الرائدة لاستعراض واكتشاف السيارات بأمان وثقة.</p>
             </div>
             <div className="flex gap-10">
                <a href="#" className="hover:text-blue-500 font-bold transition-colors">عن موتوريكس</a>

@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { ArrowRight } from 'lucide-react';
-import { toast } from 'react-hot-toast';
-import AddCarForm, { CarFormData } from './AddCarForm'; // Corrected path to match AddCarForm.tsx location
+import { toast } from 'react-hot-toast'; // Added missing import
+import AddCarForm, { CarFormData } from '../components/AddCarForm'; // Corrected path to match AddCarForm.tsx location
 
 export default function AddCarPage() {
   const navigate = useNavigate();
@@ -18,12 +18,31 @@ export default function AddCarPage() {
       toast.error("يرجى إضافة صورة واحدة على الأقل");
       return;
     }
-    console.log("AddCarPage - Submitting formData:", formData); // Add this line for debugging
     setIsLoading(true);
     try {
+      // إرسال البيانات لدالة الـ Mutation المحصنة
       await addCar({
-        token, // Pass token separately as it's not part of CarFormData
-        ...formData, // Spread all fields from formData
+        token,
+        make: formData.make,
+        model: formData.model,
+        year: formData.year,
+        price: formData.price,
+        purchasePrice: formData.purchasePrice,
+        mileage: formData.mileage,
+        location: formData.location,
+        fuel: formData.fuel,
+        transmission: formData.transmission,
+        drivetrain: formData.drivetrain,
+        condition: formData.condition,
+        images: formData.images || [],
+        mainImage: formData.mainImage || null, // يمكن أن يكون null
+        vin: formData.vin, // الحقل القانوني المهم
+        description: formData.description,
+        color: formData.color,
+        hasWarranty: formData.hasWarranty,
+        cylinders: formData.cylinders,
+        engineSize: formData.engineSize,
+        origin: formData.origin,
       });
 
       toast.success("تمت إضافة السيارة بنجاح!");

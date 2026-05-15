@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Calculator, X, Calendar, Landmark } from 'lucide-react';
 
 interface LoanCalculatorProps {

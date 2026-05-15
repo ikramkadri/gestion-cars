@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useMutation } from 'convex/react';
 import { toast } from 'react-hot-toast'; // Added missing import
 import { 
@@ -58,6 +58,7 @@ export interface CarFormData {
   price: number;
   mileage: number;
   location: string;
+  vin?: string;
   color?: string; // يمكن أن يكون اختياريًا
   condition: CarCondition; // استخدام النوع المحدد
   fuel: "Gasoline" | "Diesel" | "Electric" | "Hybrid";
@@ -143,11 +144,11 @@ interface AddCarFormProps {
   onSubmit: (data: CarFormData) => void | Promise<void>;
   isLoading: boolean;
   title?: string;
-  initialData?: CarFormData; // تحديد نوع initialData بشكل أكثر دقة
+  initialData?: CarFormData & { mainImageUrl?: string; imagesUrls?: string[] };
 }
 
 const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps) => {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState<number>(1);
   const [uploadedImages, setUploadedImages] = useState<ImageItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -157,7 +158,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
   const [isColorConfirmed, setIsColorConfirmed] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<CarFormData>({
     make: initialData?.make || '',
     model: initialData?.model || '',
     origin: initialData?.origin || '',
@@ -167,6 +168,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     price: initialData?.price || 0,
     mileage: initialData?.mileage || 0,
     location: initialData?.location || '',
+    vin: initialData?.vin || '',
     color: initialData?.color || '#FFFFFF',
     condition: initialData?.condition || 'Excellent' as CarCondition, // تحديد النوع الافتراضي
     fuel: initialData?.fuel || 'Gasoline',
@@ -175,30 +177,31 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     hasWarranty: initialData?.hasWarranty || false,
     cylinders: initialData?.cylinders || 4,
     engineSize: initialData?.engineSize || '',
+    mainImage: initialData?.mainImage,
+    images: initialData?.images,
   }); // استخدام initialData لتهيئة formData
 
-  // تحميل الصور الموجودة واللون في حال التعديل
+  // تحميل الصور الموجو��ة واللون في حال التعديل
   useEffect(() => {
-    const initial = initialData as any;
-    if (initial?.mainImage && initial?.mainImageUrl) {
-      const images: ImageItem[] = [{ storageId: initial.mainImage, url: initial.mainImageUrl }];
-      if (initial.images && initial.imagesUrls) {
-        initial.images.forEach((id: Id<"_storage">, index: number) => {
-          if (id !== initial.mainImage && initial.imagesUrls[index]) {
-            images.push({ storageId: id, url: initial.imagesUrls[index] });
+    if (initialData?.mainImage && initialData?.mainImageUrl) {
+      const images: ImageItem[] = [{ storageId: initialData.mainImage, url: initialData.mainImageUrl }];
+      if (initialData.images && initialData.imagesUrls) {
+        initialData.images.forEach((id: Id<"_storage">, index: number) => {
+          if (id !== initialData.mainImage && initialData.imagesUrls?.[index]) {
+            images.push({ storageId: id, url: initialData.imagesUrls[index] });
           }
         });
       }
       setUploadedImages(images);
-      if (initial.color) {
-        setTempColor(initial.color);
+      if (initialData.color) {
+        setTempColor(initialData.color);
         setIsColorConfirmed(true);
       }
     }
   }, [initialData]);
 
   // تحويل completedSteps إلى حالة مشتقة
-  const completedSteps = React.useMemo(() => {
+  const completedSteps = useMemo(() => {
     const steps: number[] = [];
     if (formData.make && formData.model && formData.year) steps.push(1);
     if (isColorConfirmed && formData.condition) steps.push(2);
@@ -232,7 +235,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     }
 
     setErrors({});
-    setCurrentStep(prev => prev + 1);
+    setCurrentStep((prev: number) => prev + 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -246,12 +249,11 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
-    const token = localStorage.getItem("convex_token") || "";
 
     try {
       for (const file of Array.from(files)) {
         // 1. الحصول على رابط الرفع
-        const postUrl = await generateUploadUrl({ token });
+        const postUrl = await generateUploadUrl();
 
         // 2. الرفع للسيرفر
         const result = await fetch(postUrl, {
@@ -265,7 +267,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
 
         // 3. تحديث مصفوفة الصور
         setUploadedImages(prev => [...prev, {
-          storageId,
+          storageId: storageId as Id<"_storage">,
           url: URL.createObjectURL(file)
         }]);
       }
@@ -337,7 +339,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
                 <label className="text-sm font-bold text-gray-600 mr-2 block text-right">الموديل</label>
                 <input 
                   value={formData.model} 
-                  onChange={(e) => setFormData({...formData, model: e.target.value})} 
+                onChange={(e) => setFormData({...formData, vin: e.target.value || undefined})} 
                   className={`w-full p-4 rounded-2xl border-2 ${errors.model ? 'border-red-500' : 'border-transparent'} focus:border-blue-500 focus:bg-white outline-none bg-white shadow-sm transition-all text-right`} 
                   placeholder="مثال: Camry, Golf..." 
                 />
@@ -454,7 +456,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-500 mr-2 block text-right">حجم المحرك</label>
-                  <input type="text" value={formData.engineSize || ''} onChange={(e) => setFormData({...formData, engineSize: e.target.value})} placeholder="مثال: 2.0L" className="w-full p-4 rounded-2xl bg-gray-50 border-none text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                  <input type="text" value={formData.engineSize || ''} onChange={(e) => setFormData({...formData, engineSize: e.target.value || ''})} placeholder="مثال: 2.0L" className="w-full p-4 rounded-2xl bg-gray-50 border-none text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-gray-500 mr-2 block text-right">الأسطوانات</label>
@@ -551,6 +553,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
                 </div>
               </div>
               <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-blue-100 focus-within:border-blue-500 transition-all">
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-blue-100 focus-within:border-blue-500 transition-all col-span-2">
                 <label className="text-xs font-black text-blue-600 mb-3 block">سعر العرض للبيع</label>
                 <div className="flex items-center gap-3">
                   <input type="number" value={formData.price || ''} onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent text-blue-700 focus:text-indigo-700 transition-colors" placeholder="0" />
@@ -662,8 +665,8 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               // دمج بيانات الصور المرفوعة مع بيانات النموذج قبل الإرسال
               const finalData = {
                 ...formData,
-                mainImage: uploadedImages[0]?.storageId, // أول صورة هي الرئيسية إجبارياً
-                images: uploadedImages.map(img => img.storageId)
+                mainImage: uploadedImages[0]?.storageId || undefined, // أول صورة هي الرئيسية إجبارياً
+                images: uploadedImages.slice(1).map(img => img.storageId) // باقي الصور
               };
               onSubmit(finalData as CarFormData);
             }}

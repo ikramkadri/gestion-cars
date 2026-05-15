@@ -2,7 +2,7 @@ import { mutation, query, action, internalMutation, internalQuery, MutationCtx, 
 import { v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import bcrypt from "bcryptjs"; // استيراد bcryptjs
+import * as bcrypt from "bcryptjs"; 
 
 const SESSION_EXPIRATION_MS = 1000 * 60 * 60 * 24 * 7; // الجلسة صالحة لمدة 7 أيام
 

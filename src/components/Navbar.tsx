@@ -1,10 +1,20 @@
 import React from 'react';
 import { Zap, Sun, Moon, User } from 'lucide-react';
 import { useLang } from '../lib/LanguageContext';
+import { useQuery } from 'convex/react';
+import { Id } from '../../convex/_generated/dataModel';
+import { api } from '../../convex/_generated/api';
 
 const Navbar = ({ onOpenAuth }: { onOpenAuth: () => void }) => {
   const { lang, setLang, theme, toggleTheme, t } = useLang();
   const [isScrolled, setIsScrolled] = React.useState(false);
+
+  // جلب إعدادات الموقع - يجب استدعاء Hooks في المستوى الأعلى للمكون وليس داخل useEffect
+  const settings = useQuery(api.site_settings.getSettings);
+  const logoImageUrl = useQuery(
+    api.files.getImageUrl,
+    settings?.logoImageId ? { storageId: settings.logoImageId as Id<"_storage"> } : "skip"
+  );
 
   React.useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
@@ -21,12 +31,16 @@ const Navbar = ({ onOpenAuth }: { onOpenAuth: () => void }) => {
         <div className="flex items-center gap-8">
           {/* Logo */}
           <div className="flex items-center gap-2 group cursor-pointer">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg">
-              <Zap className="text-white fill-white" size={24} />
-            </div>
+            {logoImageUrl ? (
+              <img src={logoImageUrl} alt="Showroom Logo" className="w-10 h-10 object-contain" />
+            ) : (
+              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg">
+                <Zap className="text-white fill-white" size={24} />
+              </div>
+            )}
             <div className="flex flex-col">
               <span className={`text-2xl font-black tracking-tighter transition-colors ${isScrolled ? 'text-slate-900 dark:text-white' : 'text-white'}`}>
-                MOTOR<span className="text-blue-500">IX</span>
+                {settings?.showroomName?.split(' ')[0] || "MOTOR"}<span className="text-blue-500">{settings?.showroomName?.split(' ')[1] || "IX"}</span>
               </span>
             </div>
           </div>
