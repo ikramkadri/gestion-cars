@@ -6,6 +6,7 @@ export default defineSchema({
   cars: defineTable({
     make: v.string(), 
     model: v.string(), 
+    searchName: v.string(),         // حقل مدمج للبحث المتقدم (Make + Model + Year)
     origin: v.optional(v.string()), 
     year: v.number(), 
     description: v.optional(v.string()),
@@ -41,7 +42,7 @@ export default defineSchema({
   .index("by_slug", ["slug"])       // الفهرس كان مفقوداً
   .index("by_archived", ["isArchived", "archivedAt"])
   .searchIndex("search_cars", {     // ميزة البحث المتقدم
-    searchField: "model",
+    searchField: "searchName",
     filterFields: ["make", "status", "location", "isArchived"]
   }),
 

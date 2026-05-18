@@ -9,6 +9,7 @@ import { Doc, Id } from "./_generated/dataModel";
 interface CarInsertData {
   make: string;
   model: string;
+  searchName: string;
   origin?: string;
   year: number;
   description?: string;
@@ -71,9 +72,12 @@ export const addCar = mutation({
 
     const now = Date.now();
     const slug = `${args.make}-${args.model}-${now}`.toLowerCase().replace(/ /g, "-");
+    const searchName = `${args.make} ${args.model} ${args.year}`.toLowerCase();
+
     const carData: CarInsertData = {
       make: args.make,
       model: args.model,
+      searchName: searchName,
       origin: args.origin,
       year: args.year,
       description: args.description,
