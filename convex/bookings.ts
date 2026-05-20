@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query, internalAction } from "./_generated/server";
-import { getAuthenticatedUser } from "./auth";
+import { mutation, query, internalAction, internalMutation, MutationCtx, QueryCtx, ActionCtx } from "./_generated/server";
+import { getAuthenticatedUser } from "./auth"; // Import getAuthenticatedUser
 import { internal } from "./_generated/api"; // استيراد internal لاستدعاء الدوال الداخلية
 
 /** تعريف لمتغيرات البيئة لتجنب أخطاء TypeScript و ESLint */
@@ -19,22 +19,51 @@ export const reserveCar = mutation({
   args: {
     carId: v.id("cars"),
     token: v.optional(v.string()), // إضافة التوكن للتحقق من الهوية
+    guestName: v.optional(v.string()), 
+    customerPhone: v.string(),
+    customerLocation: v.string(),
+    message: v.optional(v.string()),
+    inspectionDate: v.optional(v.number()),
+    bookingSource: v.optional(v.union(v.literal("website"), v.literal("whatsapp"), v.literal("phone_call"), v.literal("facebook"))),
   },
-  handler: async (ctx, args) => {
-    // استخدام نظام المصادقة الخاص بك لجلب المستخدم الحقيقي من جدول users
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
-    
-    if (!user) {
-      throw new Error("يجب تسجيل الدخول لإرسال طلب حجز.");
+
+    // 1. تأمين البيانات: إذا كان المستخدم مسجلاً، نفضل استخدام بياناته الموثقة
+    const phone = user?.phone || args.customerPhone;
+    const location = user?.address || args.customerLocation;
+    const fullName = user?.fullName || args.guestName || "عميل غير معروف";
+
+    if (!phone) {
+      throw new Error("رقم الهاتف ضروري لإتمام الحجز.");
+    }
+
+    // 2. التحقق من القائمة السوداء (Security First)
+    const blocked = await ctx.db
+      .query("blocked_phones")
+      .withIndex("by_phone", (q) => q.eq("phone", phone))
+      .unique();
+
+    if (blocked) {
+      throw new Error("عذراً، هذا الرقم محظور من إجراء الحجوزات. يرجى الاتصال بالإدارة.");
     }
 
     const now = Date.now();
+    const reference = `MTX-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     
     const bookingId = await ctx.db.insert("bookings", {
       carId: args.carId,
-      userId: user._id, // الآن النوع مطابق Id<"users">
-      bookingDate: now, // حقل مطلوب في الـ Schema
+      userId: user?._id, 
+      bookingDate: now, 
+      bookingReference: reference,
+      guestName: user ? undefined : args.guestName, // لا نحتاج لاسم ضيف إذا كان هناك userId
+      customerPhone: phone,
+      inspectionDate: args.inspectionDate,
+      customerLocation: location,
+      message: args.message,
       status: "pending",
+      verificationMethod: "phone_call", // الافتراضي في الجزائر
+      bookingSource: args.bookingSource ?? "website",
       createdAt: now, // تغيير التاريخ إلى رقم (Timestamp)
       updatedAt: now, // حقل مطلوب في الـ Schema
     });
@@ -42,11 +71,12 @@ export const reserveCar = mutation({
     // جلب تفاصيل السيارة لإنشاء رسالة الإشعار
     const car = await ctx.db.get(args.carId);
     const carName = car ? `${car.make} ${car.model}` : "سيارة غير معروفة";
+    const formattedDate = args.inspectionDate ? new Date(args.inspectionDate).toLocaleDateString('ar-DZ') : "لم يحدد";
 
     // نظام الإشعارات العالمي: إرسال تنبيه فوري للإدارة مع رابط مباشر
     await ctx.db.insert("notifications", {
       title: "طلب حجز جديد 🚗",
-      message: `قام العميل ${user.fullName} بحجز ${carName}. يرجى المراجعة.`,
+      message: `طلب من ${fullName} على ${carName}. الموعد: ${formattedDate}. المرجع: ${reference}`,
       type: "reservation", // استخدام التصنيف الصحيح
       priority: "high",
       actionUrl: `/admin/bookings?id=${bookingId}`,
@@ -71,7 +101,7 @@ export const sendBookingEmail = internalAction({
     bookingLink: v.string(),
     reason: v.optional(v.string()), // لسبب الرفض
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx: ActionCtx, args) => {
     console.log(`Sending email to: ${args.toEmail}`);
     console.log(`Subject: طلب حجز سيارة ${args.status === "confirmed" ? "تم قبوله" : "تم رفضه"}`);
     console.log(`Body: مرحباً ${args.customerName},`);
@@ -100,20 +130,21 @@ export const sendBookingEmail = internalAction({
  */
 export const getMyBookings = query({
   args: { token: v.optional(v.string()) },
-  handler: async (ctx, args) => {
+  handler: async (ctx: QueryCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) return [];
 
+    // فلترة صارمة: الزبون يرى فقط الحجوزات المرتبطة بمعرفه الرقمي (userId)
     const bookings = await ctx.db
       .query("bookings")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .order("desc")
+      .order("desc") // الأحدث أولاً
       .collect();
 
     return await Promise.all(
       bookings.map(async (booking) => {
         const car = await ctx.db.get(booking.carId);
-        return { ...booking, carDetails: car };
+        return { ...booking, carDetails: car, clientDetails: booking.userId ? await ctx.db.get(booking.userId) : null };
       })
     );
   },
@@ -124,7 +155,7 @@ export const getMyBookings = query({
  */
 export const getPendingBookings = query({
   args: { token: v.string() },
-  handler: async (ctx, args) => {
+  handler: async (ctx: QueryCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || (user.role !== "admin" && user.role !== "sales_manager")) {
       throw new Error("غير مصرح لك.");
@@ -139,7 +170,7 @@ export const getPendingBookings = query({
     return await Promise.all(
       bookings.map(async (booking) => {
         const car = await ctx.db.get(booking.carId);
-        const client = await ctx.db.get(booking.userId);
+        const client = booking.userId ? await ctx.db.get(booking.userId) : null; // يمكن أن يكون null إذا كان ضيفاً
         return { ...booking, carDetails: car, clientDetails: client };
       })
     );
@@ -151,7 +182,7 @@ export const getPendingBookings = query({
  */
 export const cancelBooking = mutation({
   args: { token: v.string(), bookingId: v.id("bookings") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) throw new Error("يجب تسجيل الدخول.");
 
@@ -167,7 +198,7 @@ export const cancelBooking = mutation({
  */
 export const approveBooking = mutation({
   args: { token: v.string(), bookingId: v.id("bookings") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || (user.role !== "admin" && user.role !== "sales_manager")) throw new Error("غير مصرح لك.");
 
@@ -177,22 +208,31 @@ export const approveBooking = mutation({
     await ctx.db.patch(args.bookingId, { status: "confirmed", updatedAt: Date.now() });
 
     const car = await ctx.db.get(booking.carId);
-    const customer = await ctx.db.get(booking.userId);
+    const customer = booking.userId ? await ctx.db.get(booking.userId) : null;
+
+    // إذا تم قبول الحجز، نغير حالة السيارة إلى "محجوزة" لمنع تداخل المبيعات
+    await ctx.db.patch(booking.carId, {
+      status: "Reserved",
+      updatedAt: Date.now()
+    });
 
     const carName = car ? `${car.make} ${car.model}` : "السيارة";
-    const customerEmail = customer?.email;
-    const customerName = customer?.fullName || "العميل";
+    const customerEmail = customer?.email; // البريد الإلكتروني للمستخدم المسجل
+    const customerName = customer?.fullName || booking.guestName || "العميل"; // اسم الزبون من المستخدم أو الضيف
 
-    await ctx.db.insert("notifications", {
-      userId: booking.userId,
-      title: "تم قبول طلب حجزك ✅",
-      message: `تمت الموافقة على طلب حجزك لسيارة ${carName}. يمكنك الآن التوجه للمعرض لإتمام الإجراءات.`,
-      type: "success",
-      priority: "high",
-      isRead: false,
-      actionUrl: "/my-bookings",
-      createdAt: Date.now(),
-    });
+    // إرسال إشعار للنظام الداخلي فقط إذا كان الزبون مسجلاً، لتجنب ظهوره للأدمن كإشعار موجه لنفسه
+    if (booking.userId) {
+      await ctx.db.insert("notifications", {
+        userId: booking.userId,
+        title: "تم قبول طلب حجزك ✅",
+        message: `تمت الموافقة على طلب حجزك لسيارة ${carName}. يمكنك الآن التوجه للمعرض لإتمام الإجراءات.`,
+        type: "success",
+        priority: "high",
+        isRead: false,
+        actionUrl: "/my-bookings",
+        createdAt: Date.now(),
+      });
+    }
 
     // إرسال بريد إلكتروني للزبون
     if (customerEmail) {
@@ -212,7 +252,7 @@ export const approveBooking = mutation({
  */
 export const rejectBooking = mutation({
   args: { token: v.string(), bookingId: v.id("bookings"), reason: v.string() },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || (user.role !== "admin" && user.role !== "sales_manager")) throw new Error("غير مصرح لك.");
 
@@ -226,22 +266,25 @@ export const rejectBooking = mutation({
 
     if (booking) {
       const car = await ctx.db.get(booking.carId);
-      const customer = await ctx.db.get(booking.userId);
+      const customer = booking.userId ? await ctx.db.get(booking.userId) : null;
 
       const carName = car ? `${car.make} ${car.model}` : "السيارة";
-      const customerEmail = customer?.email;
-      const customerName = customer?.fullName || "العميل";
+      const customerEmail = customer?.email; // البريد الإلكتروني للمستخدم المسجل
+      const customerName = customer?.fullName || booking.guestName || "العميل"; // اسم الزبون من المستخدم أو الضيف
 
-      await ctx.db.insert("notifications", {
-        userId: booking.userId,
-        title: "تحديث بخصوص حجزك ⚠️",
-        message: `نعتذر منك، تم رفض طلب الحجز للسبب التالي: ${args.reason}`,
-        type: "warning",
-        priority: "medium",
-        isRead: false,
-        actionUrl: "/my-bookings",
-        createdAt: Date.now()
-      });
+      // إرسال إشعار الرفض للزبون فقط إذا كان يملك حساباً
+      if (booking.userId) {
+        await ctx.db.insert("notifications", {
+          userId: booking.userId,
+          title: "تحديث بخصوص حجزك ⚠️",
+          message: `نعتذر منك، تم رفض طلب الحجز للسبب التالي: ${args.reason}`,
+          type: "warning",
+          priority: "medium",
+          isRead: false,
+          actionUrl: "/my-bookings",
+          createdAt: Date.now()
+        });
+      }
 
       // إرسال بريد إلكتروني للزبون
       if (customerEmail) {
@@ -255,5 +298,27 @@ export const rejectBooking = mutation({
         });
       }
     }
+  },
+});
+
+/**
+ * دالة داخلية لأرشفة الحجوزات القديمة (الملغاة أو المرفوضة)
+ * تُستدعى بواسطة Cron Job
+ */
+export const archiveOldBookings = internalMutation({
+  args: {},
+  handler: async (ctx: MutationCtx) => {
+    const ninetyDaysAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
+    const oldBookings = await ctx.db
+      .query("bookings")
+      .withIndex("by_createdAt", (q: FilterBuilder<Doc<"bookings">>) => q.lt("createdAt", ninetyDaysAgo))
+      .filter((q) => q.or(
+        q.eq(q.field("status"), "cancelled"),
+        q.eq(q.field("status"), "rejected")
+      ))
+      .collect();
+
+    for (const booking of oldBookings) await ctx.db.patch(booking._id, { status: "archived", updatedAt: Date.now() });
+    console.log(`[Cleanup] Archived ${oldBookings.length} old bookings.`);
   },
 });

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; 
 import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api"; // Removed unused imports
+import { api } from "../../convex/_generated/api";
 import { 
   Car, 
   DollarSign,
@@ -15,19 +15,20 @@ import {
   Edit3
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { Id } from "../../convex/_generated/dataModel"; // Keep Id import
-import { CarType } from '../features/cars/types/car.types'; // Keep CarType import
+import { Id } from "../../convex/_generated/dataModel";
+import { CarType } from '../features/cars/types/car.types';
 import StatsCard from '../components/StatsCard'; // استيراد مكون بطاقة الإحصائيات الموحد
 
 const InventoryPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [carConditionFilter, setCarConditionFilter] = useState<"All" | "New" | "Used">("All");
   const navigate = useNavigate();
   
   const token = localStorage.getItem("convex_token") ?? undefined;
   const user = useQuery(api.users.viewer, { token });
 
   // جلب البيانات من الباك اند (Convex)
-  const cars = useQuery(api.cars.getCars, { includeArchived: false });
+  const cars = useQuery(api.cars.getCars, { includeArchived: false, condition: carConditionFilter });
   const stats = useQuery(api.statistics.getDashboardStats, { token });
   const removeCar = useMutation(api.cars.deleteCar);
 
@@ -44,8 +45,8 @@ const InventoryPage = () => {
         const token = localStorage.getItem("convex_token") || "";
         await removeCar({ carId: id, token: token }); // Ensure token is passed
         toast.success("تم حذف السيارة بنجاح", { id: toastId });
-      } catch (error) {
-        console.error("خطأ أثناء الحذف:", error);
+      } catch (error: unknown) {
+        console.error("خطأ أثناء الحذف:", error); // Explicitly type error as unknown
         toast.error("فشل حذف السيارة، يرجى المحاولة لاحقاً", { id: toastId });
       }
     }
@@ -84,6 +85,34 @@ const InventoryPage = () => {
             </button>
           )}
         </div>
+      </div>
+
+      {/* فلاتر الحالة (جديد / مستعمل) */}
+      <div className="flex justify-center md:justify-start gap-3 mb-10">
+        <button
+          onClick={() => setCarConditionFilter("All")}
+          className={`px-6 py-2 rounded-full text-sm font-black transition-all ${
+            carConditionFilter === "All" ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          كل السيارات
+        </button>
+        <button
+          onClick={() => setCarConditionFilter("New")}
+          className={`px-6 py-2 rounded-full text-sm font-black transition-all ${
+            carConditionFilter === "New" ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          جديد
+        </button>
+        <button
+          onClick={() => setCarConditionFilter("Used")}
+          className={`px-6 py-2 rounded-full text-sm font-black transition-all ${
+            carConditionFilter === "Used" ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          مستعمل
+        </button>
       </div>
 
       {/* الإحصائيات */}

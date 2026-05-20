@@ -1,14 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Heart, ChevronLeft, Gauge, Car,
-  Fuel, Settings, Eye, MapPin, Calendar, Share2
+  Heart, ChevronLeft, Gauge, Car, X,
+  Fuel, Settings, Eye, MapPin, Calendar, Share2,
+  Calculator
 } from 'lucide-react';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { Id } from '../../convex/_generated/dataModel';
 import { api } from '../../convex/_generated/api';
 import { CarType } from '../features/cars/types/car.types'; // Import CarType
 import { toast } from 'react-hot-toast';
+import LoanCalculator from './LoanCalculator';
 
 /**
  * مكون داخلي لمحاكاة تأثير الكتابة
@@ -27,9 +29,6 @@ const TypewriterText = ({ text }: { text: string }) => {
   return <>{displayText}</>;
 };
 
-// الدوال المساعدة تم تجميعها هنا لضمان عدم التكرار وحل مشكلة 'already declared'
-const isHex = (color?: string) => color && /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/.test(color);
-
 const hexToRGBA = (hex: string, alpha: number) => {
   let r = 0, g = 0, b = 0;
   if (hex.length === 4) {
@@ -40,11 +39,18 @@ const hexToRGBA = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-interface CarCardProps {
-  car: CarType;
+// تعريف واجهة محلية لتوسيع CarType مع الحقول المخصصة
+interface CarCardCarType extends CarType {
+  showroomLogo?: string;
+  advisorAvatar?: string;
 }
 
-const CarCard = ({ car }: CarCardProps) => {
+interface CarCardProps {
+  car: CarCardCarType; // استخدام الواجهة الموسعة هنا
+  showRemoveButton?: boolean;
+}
+
+const CarCard = ({ car, showRemoveButton }: CarCardProps) => {
   const navigate = useNavigate();
 
   // دمج منطق الصور ليدعم الروابط المباشرة (القديمة) وروابط التخزين (الجديدة)
@@ -63,8 +69,16 @@ const CarCard = ({ car }: CarCardProps) => {
     return list.length > 0 ? list : ["/images/placeholder-car.jpg"];
   }, [car]);
  
-  const [isLiked, setIsLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
+  const token = localStorage.getItem("convex_token") || "";
+  const myFavorites = useQuery(api.favorites.getMyFavorites, token ? { token } : "skip");
+  const toggleFavorite = useMutation(api.favorites.toggleFavorite);
+
+  const isLiked = useMemo(() => {
+    return myFavorites?.some(fav => fav?._id === car._id) ?? false;
+  }, [myFavorites, car._id]);
 
   const settings = useQuery(api.site_settings.getSettings);
   const logoImageUrl = useQuery(
@@ -76,17 +90,25 @@ const CarCard = ({ car }: CarCardProps) => {
   const accentColor = '#2563eb'; 
   const goldColor = '#D4AF37';
 
-  const handleShare = (e: React.MouseEvent) => {
+  const handleShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const url = `${window.location.origin}/inventory/${car._id}`;
-    navigator.clipboard.writeText(url);
-    toast.success("تم نسخ رابط الإعلان بنجاح!", {
-      style: {
-        borderRadius: '15px',
-        background: '#1e293b',
-        color: '#fff',
-      },
-    });
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${car.make} ${car.model}`,
+          url: url
+        });
+      } catch (err) {
+        console.log("Error sharing:", err);
+      }
+    } else {
+      navigator.clipboard.writeText(url);
+      toast.success("تم نسخ رابط الإعلان بنجاح!", {
+        style: { borderRadius: '15px', background: '#1e293b', color: '#fff' },
+      });
+    }
   };
 
 
@@ -107,25 +129,29 @@ const CarCard = ({ car }: CarCardProps) => {
       >
         
         {/* قسم معرض الصور */}
-        <div className="relative w-full aspect-[4/3] overflow-hidden shrink-0">
-          {images.map((img, i) => (
-            <img 
-              key={i}
-              src={car.mainImageUrl || img} // عرض الصورة الرئيسية فقط
-              className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out group-hover:scale-105`}
-              alt={`${car.make} ${car.model}`}
-              loading="lazy" // إضافة خاصية التحميل الكسول
-            />
-          ))}
+        <div className="relative w-full aspect-[4/3] overflow-hidden shrink-0 bg-slate-100 animate-pulse">
+          <img 
+            src={car.mainImageUrl || images[0]} 
+            className="absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out group-hover:scale-110"
+            alt={`${car.make} ${car.model}`}
+            loading="lazy"
+          />
           
           {/* أزرار التفاعل العائمة (الإعجاب والمشاركة) */}
           <div className="absolute top-6 left-6 flex gap-3 z-[60]">
             <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                setIsLiked(!isLiked); 
-                if(!isLiked) toast.success("تمت الإضافة للمفضلة ❤️");
-                else toast("تمت الإزالة من المفضلة", { icon: '🗑️' });
+              onClick={async (e) => { 
+                e.stopPropagation(); // Prevent card click
+                if (!token) {
+                  toast.error("يرجى تسجيل الدخول للإضافة للمفضلة");
+                  return navigate('/login', { state: { from: window.location.pathname } });
+                }
+                try {
+                  await toggleFavorite({ carId: car._id as Id<"cars">, token });
+                  if(!isLiked) toast.success("تمت الإضافة للمفضلة ❤️");
+                } catch (error: unknown) {
+                  toast.error("حدث خطأ أثناء تحديث المفضلة");
+                }
               }}
               className={`p-3 rounded-xl backdrop-blur-xl border border-white/10 transition-all active:scale-90 ${
                 isLiked ? 'bg-rose-500 text-white border-rose-400 shadow-lg' : 'bg-white/20 text-white hover:bg-white/30'
@@ -143,18 +169,37 @@ const CarCard = ({ car }: CarCardProps) => {
 
           {/* Overlay and Navigation Buttons removed */}
 
-          <div className="absolute top-6 right-6 z-20">
+          {/* حالة السيارة أو زر الإزالة */}
+          <div className={`absolute top-6 right-6 z-20 transition-all duration-300 ${showRemoveButton ? 'opacity-0 scale-50 pointer-events-none' : 'opacity-100'}`}>
             <span className={`flex items-center gap-2 backdrop-blur-md text-[11px] font-black px-4 py-2.5 rounded-2xl shadow-xl border ${car.status === "Available" ? 'bg-white/90 text-emerald-600 border-white' : 'bg-rose-500 text-white border-rose-400'}`}>
               <div className={`w-2 h-2 rounded-full animate-pulse ${car.status === "Available" ? 'bg-emerald-500' : 'bg-white'}`} />
               {car.status === "Available" ? "متاح حالياً" : "مباع"}
             </span>
           </div>
 
+          {showRemoveButton && (
+            <button 
+              onClick={async (e) => { 
+                e.stopPropagation(); 
+                try {
+                  await toggleFavorite({ carId: car._id as Id<"cars">, token });
+                  toast.success("تمت الإزالة من المفضلة");
+                } catch (error: unknown) {
+                  toast.error("حدث خطأ أثناء الإزالة");
+                }
+              }}
+              className="absolute top-6 right-6 z-30 p-2.5 bg-rose-600 text-white rounded-xl shadow-xl hover:bg-rose-700 transition-all hover:scale-110 active:scale-95 border border-rose-400/50"
+              title="إزالة من المفضلة"
+            >
+              <X size={18} strokeWidth={3} />
+            </button>
+          )}
+
           {/* Showroom Logo instead of image dots */}
           <div className="absolute bottom-6 left-6 z-20">
             {logoImageUrl ? (
-              <img 
-                src={logoImageUrl} 
+              <img
+                src={logoImageUrl}
                 alt="Showroom Logo" 
                 className="w-10 h-10 object-contain rounded-full bg-white/30 backdrop-blur-sm border border-white/10 p-1" 
               />
@@ -171,14 +216,21 @@ const CarCard = ({ car }: CarCardProps) => {
         <div className="flex-1 p-6 flex flex-col justify-between bg-white dark:bg-slate-900 relative">
           
           <div className="flex justify-between items-start">
-            <div className="space-y-3">
-              <div className="flex items-center gap-2.5">
-                <span 
+            <div className="space-y-3 w-full">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span
                   className="text-[11px] font-black px-3.5 py-1.5 rounded-xl uppercase tracking-widest shadow-sm border transition-all"
                   style={{ backgroundColor: hexToRGBA(goldColor, 0.1), color: goldColor, borderColor: hexToRGBA(goldColor, 0.2) }}
                 >
                   {car.condition === 'New' ? 'جديد' : 'مستعمل'} {car.year}
                 </span>
+                {car.status === "Reserved" && (
+                  <span 
+                    className="text-[11px] font-black px-3.5 py-1.5 rounded-xl uppercase tracking-widest shadow-sm border transition-all bg-amber-50 text-amber-600 border-amber-100"
+                  >
+                    محجوز
+                  </span>
+                )}
                 <span className="flex items-center gap-1.5 text-slate-400 text-[11px] font-bold">
                   <Eye size={14} /> {car.viewCount || 0} مشاهدة
                 </span>
@@ -224,15 +276,28 @@ const CarCard = ({ car }: CarCardProps) => {
 
           {/* الجزء السفلي */}
           <div className="flex items-center justify-between pt-6 border-t border-slate-50 dark:border-white/5">
-            <div 
-              className="flex items-baseline gap-2 transition-all duration-500"
-              style={{ 
-                filter: isHovered ? `drop-shadow(0 0 8px ${hexToRGBA(goldColor, 0.4)})` : 'none' 
-              }}
-            >
-              <span className="text-4xl font-black tracking-tighter" style={{ color: goldColor }}>{(car.price / 1000000).toFixed(1)}</span>
-              <span className="text-xs font-black text-slate-500 uppercase">مليون دج</span>
+            <div className="flex items-center gap-3">
+              {/* صورة مستشار المبيعات - تظهر بجانب السعر عند توفرها */}
+              {car.advisorAvatar && (
+                <div className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-800 overflow-hidden shadow-sm shrink-0">
+                  <img src={car.advisorAvatar} alt="Sales Advisor" className="w-full h-full object-cover" />
+                </div>
+              )}
+              <div className="flex flex-col">
+                <div className="flex items-baseline gap-2 transition-all duration-500">
+                  <span className="text-4xl font-black tracking-tighter" style={{ color: goldColor }}>{(car.price / 1000000).toFixed(1)}</span>
+                  <span className="text-xs font-black text-slate-500 uppercase">مليون دج</span>
+                </div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setIsCalculatorOpen(true); }}
+                  className="flex items-center gap-1 text-[11px] font-black text-indigo-600 hover:text-indigo-700 transition-all mt-1 bg-indigo-50 px-2 py-0.5 rounded-lg w-fit border border-indigo-100 dark:bg-indigo-900/30 dark:border-indigo-500/20 shadow-sm active:scale-95"
+                >
+                  <Calculator size={13} />
+                  احسب التقسيط
+                </button>
+              </div>
             </div>
+            
             <span 
               className="text-xs font-black group-hover:translate-x-1 transition-all duration-500 flex items-center gap-1 px-4 py-2 rounded-xl bg-white dark:bg-white/5 border shadow-sm"
               style={{ 
@@ -246,6 +311,14 @@ const CarCard = ({ car }: CarCardProps) => {
           </div>
         </div>
       </div>
+
+      {/* مودال حاسبة القروض */}
+      {isCalculatorOpen && (
+        <LoanCalculator 
+          price={car.price} 
+          onClose={() => setIsCalculatorOpen(false)} 
+        />
+      )}
     </div>
   );
 };

@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { ArrowRight } from 'lucide-react';
-import { toast } from 'react-hot-toast'; // Added missing import
-import AddCarForm, { CarFormData } from '../components/AddCarForm'; // Corrected path to match AddCarForm.tsx location
+import { toast } from 'react-hot-toast';
+import AddCarForm, { CarFormData } from '../components/AddCarForm';
 
 export default function AddCarPage() {
   const navigate = useNavigate();

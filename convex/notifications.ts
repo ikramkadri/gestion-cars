@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation, MutationCtx, QueryCtx } from "./_generated/server"; // تم دمج الاستيرادات
 import { getAuthenticatedUser } from "./auth";
 
 /**
@@ -7,7 +7,7 @@ import { getAuthenticatedUser } from "./auth";
  */
 export const getUnreadCount = query({
   args: { token: v.optional(v.string()) },
-  handler: async (ctx, args) => {
+  handler: async (ctx: QueryCtx, args) => {
     const unread = await ctx.db
       .query("notifications")
       .withIndex("by_read_status", (q) => q.eq("isRead", false))
@@ -31,7 +31,7 @@ export const getUnreadCount = query({
  */
 export const getUnreadNotifications = query({
   args: { token: v.string() },
-  handler: async (ctx, args) => {
+  handler: async (ctx: QueryCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) return [];
     
@@ -52,7 +52,7 @@ export const getUnreadNotifications = query({
  */
 export const getAllNotifications = query({
   args: { token: v.string() },
-  handler: async (ctx, args) => {
+  handler: async (ctx: QueryCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) return [];
 
@@ -69,7 +69,7 @@ export const getAllNotifications = query({
  */
 export const markAsRead = mutation({
   args: { token: v.string(), notificationId: v.id("notifications") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) throw new Error("Unauthorized");
 
@@ -85,7 +85,7 @@ export const markAsRead = mutation({
  */
 export const markAllAsRead = mutation({
   args: { token: v.string() },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) throw new Error("Unauthorized");
 
@@ -108,7 +108,7 @@ export const markAllAsRead = mutation({
 
 export const deleteNotification = mutation({
   args: { token: v.string(), notificationId: v.id("notifications") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || user.role !== "admin") throw new Error("Admin access required");
     await ctx.db.delete(args.notificationId);
@@ -117,7 +117,7 @@ export const deleteNotification = mutation({
 
 export const clearAllNotifications = mutation({
   args: { token: v.optional(v.string()) },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || user.role !== "admin") throw new Error("صلاحية الأدمن مطلوبة.");
 
@@ -126,5 +126,23 @@ export const clearAllNotifications = mutation({
       await ctx.db.delete(n._id);
     }
     return `تم حذف ${notifs.length} إشعار بنجاح.`;
+  },
+});
+
+/**
+ * دالة داخلية لحذف الإشعارات القديمة (أكثر من 30 يوماً)
+ * تُستدعى بواسطة Cron Job
+ */
+export const clearOldNotifications = internalMutation({
+  args: {},
+  handler: async (ctx: MutationCtx) => {
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    const oldNotifications = await ctx.db
+      .query("notifications")
+      .withIndex("by_createdAt", (q: FilterBuilder<Doc<"notifications">>) => q.lt("createdAt", thirtyDaysAgo))
+      .collect();
+
+    for (const notif of oldNotifications) await ctx.db.delete(notif._id);
+    console.log(`[Cleanup] Deleted ${oldNotifications.length} old notifications.`);
   },
 });

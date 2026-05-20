@@ -1,15 +1,19 @@
-// convex/site_settings.ts
-import { mutation, query } from "./_generated/server";
+import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { getAuthenticatedUser } from "./auth"; // Assuming this utility exists
+import { getAuthenticatedUser } from "./auth"; // Import getAuthenticatedUser
 
+/**
+ * جلب إعدادات الموقع العامة
+ */
 export const getSettings = query({
-  handler: async (ctx) => {
-    const settings = await ctx.db.query("site_settings").unique();
-    return settings;
+  handler: async (ctx: QueryCtx) => {
+    return await ctx.db.query("site_settings").unique();
   },
 });
 
+/**
+ * تحديث إعدادات الموقع (للأدمن فقط)
+ */
 export const updateSettings = mutation({
   args: {
     token: v.string(),
@@ -21,46 +25,14 @@ export const updateSettings = mutation({
     currency: v.optional(v.string()),
     logoImageId: v.optional(v.id("_storage")),
   },
-  handler: async (ctx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
-    if (!user || user.role !== "admin") {
-      throw new Error("غير مصرح لك بتعديل إعدادات الموقع.");
-    }
+  handler: async (ctx: MutationCtx, args) => {
+    const { token, ...updates } = args;
+    const user = await getAuthenticatedUser(ctx, token);
+    if (!user || user.role !== "admin") throw new Error("غير مصرح لك بتعديل الإعدادات.");
+    
+    const settings = await ctx.db.query("site_settings").unique();
+    if (!settings) throw new Error("إعدادات الموقع غير موجودة.");
 
-    const existingSettings = await ctx.db.query("site_settings").unique();
-
-    const updates = {
-      showroomName: args.showroomName,
-      contactPhone: args.contactPhone,
-      contactWhatsApp: args.contactWhatsApp,
-      contactEmail: args.contactEmail,
-      address: args.address,
-      currency: args.currency,
-      logoImageId: args.logoImageId,
-      updatedAt: Date.now(),
-    };
-
-    // Filter out undefined values to avoid overwriting with null
-    const filteredUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([, value]) => value !== undefined)
-    );
-
-    if (existingSettings) {
-      await ctx.db.patch(existingSettings._id, filteredUpdates);
-      return existingSettings._id;
-    } else {
-      // If no settings exist, create them
-      const newSettings = {
-        showroomName: args.showroomName || "MOTORIX",
-        contactPhone: args.contactPhone || "",
-        contactWhatsApp: args.contactWhatsApp,
-        contactEmail: args.contactEmail || "",
-        address: args.address || "",
-        currency: args.currency || "DZD",
-        logoImageId: args.logoImageId,
-        updatedAt: Date.now(),
-      };
-      return await ctx.db.insert("site_settings", newSettings);
-    }
+    await ctx.db.patch(settings._id, { ...updates, updatedAt: Date.now() });
   },
 });

@@ -2,41 +2,6 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth"; // Assuming this utility exists
 
-export const createCustomer = mutation({
-  args: {
-    token: v.string(),
-    fullName: v.string(),
-    phone: v.string(),
-    address: v.optional(v.string()),
-    identityNum: v.optional(v.string()),
-    email: v.optional(v.string()),
-    status: v.string(),
-    totalPurchases: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
-    if (!user || (user.role !== "admin" && user.role !== "sales_manager")) {
-      throw new Error("غير مصرح لك بإضافة زبائن.");
-    }
-
-    const now = Date.now();
-    const customerId = await ctx.db.insert("customers", {
-      fullName: args.fullName,
-      phone: args.phone,
-      email: args.email,
-      address: args.address || "",
-      identityNum: args.identityNum || "",
-      status: args.status,
-      totalPurchases: args.totalPurchases || 0,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await ctx.db.insert("activity_logs", { action: "CUSTOMER_CREATED", details: `تم إضافة الزبون ${args.fullName}`, userId: user._id, timestamp: now });
-    return customerId;
-  },
-});
-
 export const listCustomers = query({
   args: { token: v.optional(v.string()), searchTerm: v.optional(v.string()) },
   handler: async (ctx, args) => {
@@ -89,7 +54,7 @@ export const updateCustomer = mutation({
       updatedAt: Date.now(),
     });
 
-    await ctx.db.insert("activity_logs", { action: "CUSTOMER_UPDATED", details: `تم تحديث بيانات الزبون ${args.fullName || customerId}`, userId: user._id, timestamp: Date.now() });
+    await ctx.db.insert("activity_logs", { action: "CUSTOMER_UPDATED", details: `تم تحديث بيانات الزبون ${args.fullName || customerId}`, userId: user._id, createdAt: Date.now() });
     return true;
   },
 });
@@ -107,7 +72,7 @@ export const deleteCustomer = mutation({
 
     await ctx.db.delete(args.customerId);
 
-    await ctx.db.insert("activity_logs", { action: "CUSTOMER_DELETED", details: `تم حذف الزبون ${customer.fullName}`, userId: user._id, timestamp: Date.now() });
+    await ctx.db.insert("activity_logs", { action: "CUSTOMER_DELETED", details: `تم حذف الزبون ${customer.fullName}`, userId: user._id, createdAt: Date.now() });
     return true;
   },
 });

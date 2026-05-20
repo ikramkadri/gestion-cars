@@ -4,13 +4,15 @@ import {
   LayoutDashboard, Car, Settings, LogOut, 
   Users, BookOpen, FileText, BarChart3, ShieldCheck,
   ShoppingCart,
-  ChevronRight, ChevronLeft, UserCheck, Receipt, PlusCircle, Archive, Bell, Search,
-  ShieldAlert
+  ChevronRight, ChevronLeft, UserCheck, PlusCircle, Archive, Bell, Search, Star,
+  ShieldAlert, CheckCircle, XCircle
 } from 'lucide-react';
 import type { Doc } from '../../convex/_generated/dataModel';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { Id } from '../../convex/_generated/dataModel'; // Import Id for storageId
 import { api } from '../../convex/_generated/api';
+import { toast } from 'react-hot-toast';
+import { AnimatePresence, motion } from 'framer-motion';
 
 interface UserType extends Doc<"users"> {
   role: "admin" | "sales_manager" | "viewer";
@@ -25,7 +27,11 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ user, onSignOut }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const token = localStorage.getItem("convex_token") || "";
+
+  // جلب الإشعارات غير المقروءة
+  const unreadNotifications = useQuery(api.notifications.getUnreadNotifications, token ? { token } : "skip");
 
   // جلب عدد التنبيهات غير المقروءة الحقيقي
   const unreadCount = useQuery(api.notifications.getUnreadCount, { token }) ?? 0;
@@ -35,6 +41,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onSignOut }) => {
     api.files.getImageUrl,
     settings?.logoImageId ? { storageId: settings.logoImageId as Id<"_storage"> } : "skip"
   );
+
+  const approveUser = useMutation(api.users.approveUser);
+  const markNotificationAsRead = useMutation(api.notifications.markAsRead);
 
   // تعريف القائمة بناءً على رتبة المستخدم
   const menuItems = useMemo(() => [
@@ -63,18 +72,84 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onSignOut }) => {
 
       ...(user?.role === 'admin' ? [
         { id: 'statistics', label: 'التقارير المالية', icon: BarChart3, color: 'text-rose-500' },
-        { id: 'expenses', label: 'إدارة المصاريف', icon: Receipt, color: 'text-orange-500' },
         { id: 'users', label: 'إدارة الموظفين', icon: ShieldCheck, color: 'text-indigo-500' },
+        { id: 'reviews-admin', label: 'إدارة التقييمات', icon: Star, color: 'text-amber-500' },
         { id: 'settings', label: 'إعدادات النظام', icon: Settings, color: 'text-slate-400' },
       ] : [{ id: 'settings', label: 'حسابي الشخصي', icon: UserCheck, color: 'text-slate-400' }]),
     ]),
   ], [user?.role, unreadCount]);
+
+  const handleApproveUser = async (notificationId: Id<"notifications">, userId: Id<"users">) => {
+    try {
+      const toastId = toast.loading("جاري تفعيل الحساب...");
+      await approveUser({ token, userId });
+      await markNotificationAsRead({ token, notificationId });
+      toast.success("تم تفعيل المستخدم بنجاح 🎉", { id: toastId });
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء التفعيل");
+    }
+  };
 
   return (
     <aside 
       className={`sticky top-0 h-screen ${isCollapsed ? 'w-20' : 'w-72'} bg-white dark:bg-slate-950 text-slate-900 dark:text-white p-4 flex flex-col shadow-xl z-[100] border-l border-slate-100 dark:border-white/5 transition-all duration-300 ease-in-out`} 
       dir="rtl"
     >
+      {/* زر الجرس للإشعارات */}
+      {user?.role !== 'viewer' && ( // فقط للمدراء وموظفي المبيعات
+        <div className="relative mb-4 flex justify-end">
+          <button 
+            onClick={() => setShowNotificationsDropdown(!showNotificationsDropdown)}
+            className="p-2 rounded-full bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
+          >
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full animate-pulse">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+          <AnimatePresence>
+            {showNotificationsDropdown && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }} // notif is already typed as Doc<"notifications">
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute top-12 right-0 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-white/10 overflow-hidden z-50"
+              >
+                <div className="p-4 border-b border-slate-100 dark:border-white/10 flex justify-between items-center">
+                  <h4 className="font-black text-slate-900 dark:text-white">الإشعارات</h4>
+                  <button onClick={() => setShowNotificationsDropdown(false)} className="text-slate-400 hover:text-slate-600"><XCircle size={18} /></button>
+                </div>
+                <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                  {unreadNotifications && unreadNotifications.length > 0 ? (
+                    unreadNotifications.map((notif) => (
+                      <div key={notif._id} className="p-4 border-b border-slate-50 dark:border-white/5 last:border-b-0">
+                        <p className="font-bold text-sm text-slate-800 dark:text-white">{notif.title}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{notif.message}</p>
+                        {notif.actionType === "APPROVE_USER" && notif.targetId && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation(); // منع إغلاق القائمة عند الضغط على الزر
+                              handleApproveUser(notif._id, notif.targetId as Id<"users">);
+                            }}
+                            className="mt-3 bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-black hover:bg-indigo-700 transition-all shadow-lg flex items-center gap-2"
+                          >
+                            <CheckCircle size={16} /> تفعيل الحساب الآن
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="p-4 text-center text-slate-400 text-sm">لا توجد إشعارات جديدة.</p>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
       {/* زر الطي (Toggle Button) */}
       <button 
         onClick={() => setIsCollapsed(!isCollapsed)}
@@ -85,7 +160,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onSignOut }) => {
 
       <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} mb-10 px-2 py-4 border-b border-slate-50 dark:border-white/5 overflow-hidden`}>
         {logoImageUrl ? (
-          <img src={logoImageUrl} alt="Showroom Logo" className="w-10 h-10 object-contain" />
+          <img src={logoImageUrl} alt="Showroom Logo" className="w-12 h-12 object-contain filter drop-shadow-md" />
         ) : (
           <div className="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-600/20">
             <Car size={24} className="text-white" />

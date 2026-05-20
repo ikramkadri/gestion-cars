@@ -2,10 +2,10 @@
  * المسار: convex/activity_logs.ts
  * الوظيفة: جلب آخر النشاطات التي حدثت في النظام.
  */
-
-import { query } from "./_generated/server";
+import { query, internalMutation, MutationCtx, FilterBuilder } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth"; // استيراد دالة المصادقة الموحدة
+import { Doc } from "./_generated/dataModel";
 
 export const getLatestLogs = query({
   args: { limit: v.optional(v.number()), token: v.optional(v.string()) },
@@ -16,7 +16,7 @@ export const getLatestLogs = query({
     const logs = await ctx.db
       .query("activity_logs")
       .order("desc")
-      .take(args.limit ?? 10);
+      .take(args.limit ?? 10); // استخدام createdAt للترتيب
 
     return await Promise.all(
       logs.map(async (log) => {
@@ -27,5 +27,23 @@ export const getLatestLogs = query({
         };
       })
     );
+  },
+});
+
+/**
+ * دالة داخلية لحذف سجلات النشاط القديمة (أكثر من 90 يوماً)
+ * تُستدعى بواسطة Cron Job
+ */
+export const clearOldLogs = internalMutation({
+  args: {},
+  handler: async (ctx: MutationCtx) => {
+    const ninetyDaysAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
+    const oldLogs = await ctx.db
+      .query("activity_logs")
+      .withIndex("by_createdAt", (q: FilterBuilder<Doc<"activity_logs">>) => q.lt("createdAt", ninetyDaysAgo))
+      .collect();
+
+    for (const log of oldLogs) await ctx.db.delete(log._id);
+    console.log(`[Cleanup] Deleted ${oldLogs.length} old activity logs.`);
   },
 });

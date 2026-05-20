@@ -2,7 +2,7 @@
  * المسار: convex/statistics.ts
  * الوظيفة: تزويد لوحة التحكم بالأرقام المالية، حالة المخزون، وبيانات الرسم البياني للمبيعات الشهرية.
  */
-import { query } from "./_generated/server";
+import { query, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth";
 
@@ -17,14 +17,14 @@ export const getDashboardStats = query({
     const availableCars = await ctx.db
       .query("cars")
       .withIndex("by_status_archived", (q) => 
-        q.eq("status", "Available").eq("isArchived", false)
+        q.eq("status", "Available").eq("isArchived", false) // Type is inferred
       )
       .collect();
 
     const soldCars = await ctx.db
       .query("cars")
       .withIndex("by_status_archived", (q) => 
-        q.eq("status", "Sold").eq("isArchived", false)
+        q.eq("status", "Sold").eq("isArchived", false) // Type is inferred
       )
       .collect();
 
@@ -38,13 +38,9 @@ export const getDashboardStats = query({
     // إذا كان مدير مبيعات، نجلب مبيعاته فقط
     let salesQuery = ctx.db.query("sales");
     if (isSales) {
-      salesQuery = salesQuery.filter((q) => q.eq(q.field("sellerId"), user?._id));
+      salesQuery = salesQuery.filter((q) => q.eq(q.field("sellerId"), user?._id)); // Type is inferred
     }
     const allSales = await salesQuery.collect();
-
-    // جلب كافة المصاريف العامة (Operational Expenses)
-    const allExpenses = await ctx.db.query("expenses").collect();
-    const totalOperationalExpenses = allExpenses.reduce((sum, e) => sum + e.amount, 0);
 
     // 3. الحسابات المالية الأساسية
     const totalRevenue = allSales.reduce((sum, s) => sum + (s.amountPaid || 0), 0);
@@ -53,23 +49,34 @@ export const getDashboardStats = query({
     let sumDaysToSell = 0;
     const brandMap = new Map<string, number>();
     const sellersMap = new Map<string, { name: string, total: number, count: number }>();
+    const sourceMap = new Map<string, number>();
 
-    // الأدمن فقط يرى صافي الأرباح
-    if (isAdmin) {
+    // الأدمن ومدير المبيعات يريان الإحصائيات (كل واحد حسب صلاحياته في جلب allSales)
+    if (isAdmin || isSales) {
       for (const sale of allSales) {
         const car = await ctx.db.get(sale.carId);
         const seller = await ctx.db.get(sale.sellerId);
         
         if (car) {
-          // 1. حساب الربح (سعر البيع - سعر الشراء)
-          totalProfit += (sale.amountPaid - (car.purchasePrice || 0));
-          
+          // 1. حساب الربح (للأدمن فقط لضمان السرية المالية)
+          if (isAdmin) {
+            totalProfit += (sale.amountPaid - (car.purchasePrice || 0));
+          }
+
           // 2. حساب أيام البيع (تاريخ البيع - تاريخ الإضافة للمخزن)
           const days = Math.floor((sale.saleDate - car.createdAt) / (1000 * 60 * 60 * 24));
           sumDaysToSell += Math.max(0, days);
 
           // 3. توزيع العلامات التجارية
           brandMap.set(car.make, (brandMap.get(car.make) || 0) + 1);
+
+          // 4. توزيع مصادر المبيعات (عن طريق الحجوزات المرتبطة)
+          if (sale.bookingId) {
+            const booking = await ctx.db.get(sale.bookingId);
+            if (booking?.bookingSource) {
+              sourceMap.set(booking.bookingSource, (sourceMap.get(booking.bookingSource) || 0) + 1);
+            }
+          }
         }
 
         if (seller) {
@@ -91,6 +98,14 @@ export const getDashboardStats = query({
     // تحويل خرائط البيانات إلى مصفوفات للواجهة
     const brandDistribution = Array.from(brandMap.entries()).map(([name, value]) => ({ name, value }));
     const leaderboard = Array.from(sellersMap.values()).sort((a, b) => b.total - a.total);
+    
+    const sourceDistribution = Array.from(sourceMap.entries()).map(([name, value]) => ({ 
+      name: name === "website" ? "الموقع" : 
+            name === "whatsapp" ? "واتساب" : 
+            name === "facebook" ? "فيسبوك" : 
+            name === "phone_call" ? "اتصال هاتفي" : name, 
+      value 
+    }));
 
     // 4. إعداد بيانات الرسم البياني (المبيعات الشهرية)
     // سنقوم بإنشاء خريطة (Map) لتجميع المبيعات حسب "السنة-الشهر"
@@ -104,7 +119,7 @@ export const getDashboardStats = query({
 
     allSales.forEach((sale) => {
       const date = new Date(sale.saleDate || sale._creationTime);
-      const monthIndex = date.getMonth();
+      const monthIndex = date.getMonth(); // Type is inferred
       const year = date.getFullYear();
       const key = `${year}-${monthIndex}`; // مفتاح فريد للشهر والسنة
 
@@ -133,12 +148,13 @@ export const getDashboardStats = query({
       financials: { 
         totalRevenue, 
         totalProfit, 
-        expenses: totalOperationalExpenses,
+        expenses: 0,
         stockValue,
         conversionRate
       },
       chartData, // هذه البيانات تذهب مباشرة للرسم البياني
       brandDistribution,
+      sourceDistribution,
       leaderboard,
       lastUpdate: Date.now()
     };

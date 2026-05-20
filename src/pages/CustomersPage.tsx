@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Search, UserPlus, Phone, CreditCard, Trash2, Edit3, Loader2, DollarSign, MapPin } from 'lucide-react';
+import { Search, Phone, CreditCard, Trash2, Edit3, Loader2, DollarSign, MapPin } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Doc, Id } from '../../convex/_generated/dataModel';
 
@@ -35,9 +35,6 @@ const CustomersPage = () => {
           <h1 className="text-3xl font-black text-slate-900">إدارة الزبائن</h1>
           <p className="text-slate-500 font-bold italic">قاعدة بيانات العملاء المسجلين في Motorix</p>
         </div>
-        <button className="bg-indigo-600 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-black shadow-lg hover:bg-indigo-700 transition-all">
-          <UserPlus size={20} /> إضافة زبون جديد
-        </button>
       </div>
 
       <div className="relative max-w-md mb-8">
@@ -63,7 +60,7 @@ const CustomersPage = () => {
               <th className="px-8 py-4 text-center">الإجراءات</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-slate-50"> {/* customer is implicitly typed as Doc<"customers"> */}
             {customers.map((customer) => (
               <tr key={customer._id} className="hover:bg-slate-50 transition-all group">
                 <td className="px-8 py-5">

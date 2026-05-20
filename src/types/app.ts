@@ -1,5 +1,4 @@
 import type { Doc } from "../../convex/_generated/dataModel";
-import { CarType } from "../features/cars/types/car.types";
 
 /**
  * يمثل عملية بيع مع تفاصيل إضافية مجمعة من جداول السيارات والزبائن
@@ -29,7 +28,14 @@ export type ClientDetails = Doc<"customers">;
  * يمثل طلب حجز مع البيانات الكاملة للسيارة والزبون
  * نستخدم التقاطع (&) لإضافة الحقول التي يتم جلبها عبر الـ Join في Query
  */
-export type BookingWithDetails = Doc<"bookings"> & {
-  carDetails: CarType;
-  clientDetails: ClientDetails;
+export type BookingWithDetails = Doc<"bookings"> & { // The booking itself
+  carDetails: Doc<"cars">; // Details of the car that was booked
+  clientDetails: Doc<"users"> | null; // يمكن أن يكون null للزوار
+  customerPhone: string; // ضمان توفر الهاتف في الحجز
+  customerLocation: string; // ضمان توفر الولاية في الحجز
+  inspectionDate?: number; // موعد المعاينة
+  bookingReference: string;
+  guestName?: string;
+  verificationMethod?: "phone_call" | "whatsapp" | "manual";
+  bookingSource?: "website" | "whatsapp" | "phone_call" | "facebook";
 };

@@ -47,7 +47,7 @@ const AdminLayout = ({ children }: { children?: React.ReactNode }) => {
         ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
       `}>
         <Sidebar 
-          user={user} 
+          user={user ? { ...user, imageUrl: user.imageUrl ?? undefined } : user} 
           onSignOut={handleSignOut} 
         />
       </div>

@@ -1,9 +1,25 @@
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { TrendingUp, BarChart3, ArrowUpRight, Loader2, Users, Receipt, Clock, Target, Award } from 'lucide-react'; // Removed unused Wallet, Package
+import { TrendingUp, BarChart3, ArrowUpRight, Loader2, Users, Clock, Target, Award, MousePointer2 } from 'lucide-react'; // Removed unused Wallet, Package, Receipt
 import DashboardChart from '../components/DashboardChart';
 import StatsCard from '../components/StatsCard';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+
+interface BrandStat {
+  name: string;
+  value: number;
+}
+
+interface SellerStat {
+  name: string;
+  total: number;
+  count: number;
+}
+
+interface SourceStat {
+  name: string;
+  value: number;
+}
 
 const StatisticsPage = () => {
   const token = localStorage.getItem("convex_token") || "";
@@ -17,6 +33,7 @@ const StatisticsPage = () => {
 
   // ألوان متناسقة للرسم البياني الدائري
   const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4'];
+  const SOURCE_COLORS = ['#3b82f6', '#22c55e', '#1877f2', '#f97316'];
 
   return (
     <div className="min-h-screen bg-[#F8F9FD] p-8 font-sans text-right" dir="rtl">
@@ -35,14 +52,6 @@ const StatisticsPage = () => {
           icon={TrendingUp}
           color="text-emerald-600"
           bg="bg-emerald-50"
-        />
-        <StatsCard 
-          label="إجمالي المصاريف"
-          val={stats.financials.expenses}
-          unit="دج"
-          icon={Receipt}
-          color="text-rose-600"
-          bg="bg-rose-50"
         />
         <StatsCard 
           label="متوسط وقت البيع"
@@ -73,17 +82,17 @@ const StatisticsPage = () => {
         
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
           <h3 className="font-black text-slate-800 text-lg mb-6 flex items-center gap-2">توزيع الماركات المباعة</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
               <PieChart>
                 <Pie
-                  data={stats.brandDistribution}
+                  data={stats.brandDistribution || []}
                   innerRadius={60}
                   outerRadius={80}
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {stats.brandDistribution.map((_entry: any, index: number) => (
+                  {stats.brandDistribution.map((_entry: BrandStat, index: number) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
@@ -92,6 +101,31 @@ const StatisticsPage = () => {
             </ResponsiveContainer>
           </div>
           
+          {/* الرسم البياني الجديد لمصادر المبيعات */}
+          <div className="mt-10 pt-10 border-t">
+            <h3 className="font-black text-slate-800 text-sm mb-6 flex items-center gap-2">
+              <MousePointer2 size={18} className="text-blue-500" /> من أين يأتي المشترون؟
+            </h3>
+            <div className="h-48 w-full min-w-0">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
+                <PieChart>
+                  <Pie
+                    data={stats.sourceDistribution || []}
+                    innerRadius={40}
+                    outerRadius={60}
+                    paddingAngle={8}
+                    dataKey="value"
+                  >
+                    {(stats.sourceDistribution || []).map((_entry: SourceStat, index: number) => (
+                      <Cell key={`source-cell-${index}`} fill={SOURCE_COLORS[index % SOURCE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
           {/* لوحة الشرف للموظفين */}
           <div className="mt-6 space-y-4">
             <div className="flex items-center justify-between mb-4 border-t pt-6">
@@ -101,7 +135,7 @@ const StatisticsPage = () => {
                <Users size={16} className="text-slate-300" />
             </div>
             
-            {stats.leaderboard?.length > 0 ? stats.leaderboard.map((seller: any, i: number) => (
+            {stats.leaderboard?.length > 0 ? stats.leaderboard.map((seller: SellerStat, i: number) => (
               <div key={i} className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl">
                 <div className="flex items-center gap-3">
                   <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[10px] font-black border border-slate-100">{i+1}</span>

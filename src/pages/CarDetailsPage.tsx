@@ -1,11 +1,11 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from 'convex/react'; // Keep useQuery
-import { useMemo } from 'react'; // Import useMemo
+import { useQuery } from 'convex/react';
+import { useMemo } from 'react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
-import { Loader2, ArrowRight } from 'lucide-react'; // Consolidated imports
+import { Loader2, ArrowRight } from 'lucide-react';
 import { CarType } from '../features/cars/types/car.types';
-import CarDetailsContent from './CarDetailsContent';
+import CarDetailsContent from '../components/CarDetailsContent';
 
 const CarDetailsPage = () => {
   const { carId } = useParams();

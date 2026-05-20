@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth";
 import { Doc, Id } from "./_generated/dataModel";
 
-/**
+/** // CarInsertData is already defined
  * تعريف نوع بيانات السيارة لضمان مطابقة الـ Schema تماماً وتجنب أخطاء TypeScript
  */
 interface CarInsertData {
@@ -64,7 +64,7 @@ export const addCar = mutation({
     color: v.optional(v.string()),
     condition: v.union(v.literal("New"), v.literal("Excellent"), v.literal("Good"), v.literal("Fair"), v.literal("Poor")),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || user.role === "viewer") {
       throw new Error("عذراً، لا تملك صلاحية إضافة سيارات.");
@@ -150,10 +150,9 @@ export const updateCar = mutation({
       condition: v.optional(v.union(v.literal("New"), v.literal("Excellent"), v.literal("Good"), v.literal("Fair"), v.literal("Poor"))),
       status: v.optional(v.union(v.literal("Available"), v.literal("Sold"), v.literal("Reserved"))),
       isArchived: v.optional(v.boolean()),
-      archivedAt: v.optional(v.number()),
     }),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || (user.role !== "admin" && user.role !== "sales_manager")) throw new Error("غير مصرح لك بتعديل السيارات");
 
@@ -181,7 +180,7 @@ export const updateCar = mutation({
  */
 export const deleteCar = mutation({
   args: { token: v.string(), carId: v.id("cars") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || user.role !== "admin") throw new Error("للأدمن فقط");
 
@@ -197,7 +196,7 @@ export const deleteCar = mutation({
  */
 export const deleteCarById = mutation({
   args: { carId: v.id("cars") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     // ملاحظة: تم إزالة التحقق من التوكن هنا للسماح لك بالتنظيف السريع في بيئة التطوير
     await ctx.db.delete(args.carId);
     return "تم حذف السيارة بنجاح.";
@@ -209,7 +208,7 @@ export const deleteCarById = mutation({
  */
 export const clearAllCars = mutation({
   args: { token: v.optional(v.string()) },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || user.role !== "admin") throw new Error("صلاحية الأدمن مطلوبة.");
 
@@ -227,20 +226,26 @@ export const clearAllCars = mutation({
 export const getCars = query({
   args: { 
     includeArchived: v.optional(v.boolean()),
-    status: v.optional(v.union(v.literal("Available"), v.literal("Sold"), v.literal("Reserved")))
+    status: v.optional(v.union(v.literal("Available"), v.literal("Sold"), v.literal("Reserved"))),
+    condition: v.optional(v.union(v.literal("New"), v.literal("Used"), v.literal("All"))), // إضافة فلتر جديد
   },
-  handler: async (ctx, args) => {
-    const carQuery = ctx.db
+  handler: async (ctx: QueryCtx, args) => {
+    let carQuery = ctx.db
       .query("cars")
       .withIndex("by_archived", (q) => q.eq("isArchived", args.includeArchived ?? false));
 
-    let cars = await carQuery.order("desc").collect();
     if (args.status) {
-      cars = cars.filter(c => c.status === args.status);
+      carQuery = carQuery.filter(q => q.eq(q.field("status"), args.status));
     }
+
+    const cars = await carQuery.order("desc").collect();
+
+    // تصفية الحالة (بقيت يدوية لأنها تتطلب منطق Not Equal أحياناً)
+    const finalCars = args.condition === "New" ? cars.filter(c => c.condition === "New") : 
+                     args.condition === "Used" ? cars.filter(c => c.condition !== "New") : cars;
     
     return await Promise.all(
-      cars.map(async (car) => ({
+      finalCars.map(async (car) => ({
         ...car,
         mainImageUrl: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : undefined,
       }))
@@ -257,14 +262,18 @@ export const searchCars = query({
     make: v.optional(v.string()),
     status: v.optional(v.union(v.literal("Available"), v.literal("Sold"), v.literal("Reserved"))), // إضافة status للفلترة
     location: v.optional(v.string()), // إضافة location للفلترة
+    minPrice: v.optional(v.number()),
+    maxPrice: v.optional(v.number()),
+    fuel: v.optional(v.string()),
+    transmission: v.optional(v.string()),
   }, 
-  handler: async (ctx, args) => {
+  handler: async (ctx: QueryCtx, args) => {
     let results: Doc<"cars">[];
     if (args.searchTerm.length > 0) {
       results = await ctx.db
         .query("cars")
         .withSearchIndex("search_cars", (q) => {
-          let search = q.search("model", args.searchTerm)
+          let search = q.search("searchName", args.searchTerm)
             .eq("isArchived", false);
           
           if (args.make) search = search.eq("make", args.make);
@@ -287,6 +296,12 @@ export const searchCars = query({
       if (args.make) results = results.filter(c => c.make === args.make);
     }
     
+    // تطبيق فلاتر المدى والمواصفات يدوياً (لأن Search Index في Convex يدعم فقط المساواة)
+    if (args.minPrice !== undefined) results = results.filter(c => c.price >= args.minPrice!);
+    if (args.maxPrice !== undefined) results = results.filter(c => c.price <= args.maxPrice!);
+    if (args.fuel) results = results.filter(c => c.fuel === args.fuel);
+    if (args.transmission) results = results.filter(c => c.transmission === args.transmission);
+
     return await Promise.all(
       results.map(async (car) => ({
         ...car,
@@ -301,7 +316,7 @@ export const searchCars = query({
  */
 export const getCarById = query({
   args: { carId: v.id("cars") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: QueryCtx, args) => {
     const car = await ctx.db.get(args.carId);
     if (!car) return null;
     

@@ -5,15 +5,13 @@ import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import AddCarForm, { CarFormData } from "../components/AddCarForm";
 import { Loader2, ArrowRight } from "lucide-react";
-import { toast } from "react-hot-toast"; // Corrected named import
+import { toast } from "react-hot-toast";
 
 export default function EditCarPage() {
-  const { carId } = useParams<{ carId: string }>();
+  const { carId } = useParams();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // جلب بيانات السيارة
-  // جلب بيانات السيارة (CarType)
   const car = useQuery(api.cars.getCarById, { carId: carId as Id<"cars"> });
   const updateCar = useMutation(api.cars.updateCar);
 
@@ -59,7 +57,7 @@ export default function EditCarPage() {
         title={`تعديل: ${car.make} ${car.model}`}
         initialData={{
           ...car,
-          mainImage: car.mainImage || null, // Ensure mainImage is Id<"_storage"> | null
+          mainImage: car.mainImage || undefined,
           images: car.images || [], // Ensure images is Id<"_storage">[]
         }}
         onSubmit={handleSubmit}

@@ -78,7 +78,7 @@ const UsersPage = () => {
   return (
     <div className="min-h-screen bg-[#F8F9FD] p-8 font-sans" dir="rtl">
       {/* العنوان */}
-      <div className="mb-10 text-right">
+      <div className="mb-10 text-right"> {/* user is implicitly typed as Doc<"users"> */}
         <h1 className="text-3xl font-black text-slate-900">إدارة فريق العمل</h1>
         <p className="text-slate-500 font-bold italic">تحكم في صلاحيات المستخدمين والوصول للنظام</p>
       </div>
@@ -124,7 +124,7 @@ const UsersPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredUsers.length > 0 ? filteredUsers.map((user) => (
+              {filteredUsers.length > 0 ? filteredUsers.map((user: Doc<"users">) => (
                 <tr key={user._id} className="hover:bg-slate-50/50 transition-all group">
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-4">

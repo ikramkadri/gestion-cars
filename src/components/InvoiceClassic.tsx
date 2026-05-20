@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Printer, Car, Loader2, Send } from 'lucide-react';
+import { Printer, Car, Loader2, Send, Download } from 'lucide-react';
 import { SaleWithDetails } from '../types/app';
 import emailjs from '@emailjs/browser';
 import { toast } from 'react-hot-toast';
@@ -19,6 +19,7 @@ interface InvoiceClassicProps {
 }
 
 const InvoiceClassic = ({ isOpen, onClose, sale, settings }: InvoiceClassicProps) => {
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
   // بيانات افتراضية في حال عدم توفرها للمعاينة
@@ -97,10 +98,36 @@ const InvoiceClassic = ({ isOpen, onClose, sale, settings }: InvoiceClassicProps
       );
       toast.success("تم إرسال الفاتورة كملف PDF بنجاح 📧", { id: toastId });
     } catch (error) {
-      toast.error("فشل في تحويل أو إرسال الفاتورة.", { id: toastId });
+      toast.error("فشل في تحويل أو إرسال الفاتورة.", { id: toastId }); // error is implicitly any
       console.error("EmailJS Error:", error);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById('printable-invoice');
+    if (!element) return;
+
+    setIsGenerating(true);
+    const toastId = toast.loading("جاري تجهيز ملف PDF...");
+
+    try {
+      const opt = {
+        margin:       10,
+        filename:     `Invoice-${defaultSale.invoiceNumber}.pdf`,
+        image:        { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF:        { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+      };
+
+      await html2pdf().from(element).set(opt).save();
+      toast.success("تم تحميل الفاتورة بنجاح ✅", { id: toastId });
+    } catch (error: unknown) {
+      toast.error("حدث خطأ أثناء تحميل الملف", { id: toastId }); // error is implicitly any
+      console.error(error);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -244,6 +271,14 @@ const InvoiceClassic = ({ isOpen, onClose, sale, settings }: InvoiceClassicProps
             <Printer size={18}/> طباعة الفاتورة
           </button>
           <button 
+            disabled={isGenerating}
+            onClick={handleDownloadPDF}
+            className="bg-blue-600 text-white px-10 py-3 rounded-full font-black flex items-center gap-2 hover:bg-blue-700 transition-all shadow-xl disabled:opacity-50"
+          >
+            {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <Download size={18}/>}
+            حفظ كـ PDF
+          </button>
+          <button 
             disabled={isSending}
             onClick={handleSendEmail}
             className="bg-emerald-600 text-white px-10 py-3 rounded-full font-black flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-xl disabled:opacity-50"
@@ -262,9 +297,36 @@ const InvoiceClassic = ({ isOpen, onClose, sale, settings }: InvoiceClassicProps
 
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          #printable-invoice, #printable-invoice * { visibility: visible; }
-          #printable-invoice { position: absolute; left: 0; top: 0; width: 100%; padding: 0 !important; }
+          /* 1. إخفاء كل شيء في الصفحة */
+          body { 
+            visibility: hidden; 
+            background: white !important; 
+          }
+          
+          /* 2. إظهار الحاوية الرئيسية للمودال والفاتورة فقط */
+          .fixed.inset-0, 
+          .bg-white.w-full, 
+          #printable-invoice, 
+          #printable-invoice * { 
+            visibility: visible !important; 
+          }
+
+          /* 3. إلغاء تأثيرات المودال (الخلفية السوداء والشفافية) لكي لا تظهر في الطباعة */
+          .fixed.inset-0 { 
+            position: absolute !important; 
+            background: white !important; 
+            backdrop-filter: none !important; 
+          }
+
+          /* 4. تمديد الفاتورة لتأخذ كامل الصفحة */
+          .bg-white.w-full {
+            box-shadow: none !important;
+            border: none !important;
+            max-width: 100% !important;
+          }
+
+          /* 5. إخفاء الأزرار نهائياً */
+          .print\\:hidden { display: none !important; }
         }
       `}</style>
     </div>

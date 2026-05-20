@@ -10,15 +10,16 @@ const NotificationsPage = () => {
   const [filter, setFilter] = useState('all');
   const token = localStorage.getItem("convex_token") || "";
   const navigate = useNavigate();
-
+  
+  // تمرير filter إلى الـ Convex query
   const notifications = useQuery(api.notifications.getAllNotifications, { token });
   const markAllRead = useMutation(api.notifications.markAllAsRead);
   const deleteNotif = useMutation(api.notifications.deleteNotification);
   const markRead = useMutation(api.notifications.markAsRead);
-
+  
   const filteredNotifications = useMemo(() => {
     if (!notifications) return [];
-    if (filter === 'all' || filter === 'الكل') return notifications;
+    if (filter === 'all') return notifications;
     return notifications.filter(n => n.type === filter);
   }, [notifications, filter]);
 
@@ -129,7 +130,7 @@ const NotificationsPage = () => {
                 <div className="flex-1">
                   <div className="flex justify-between items-center mb-0.5">
                     <h3 className={`font-black text-[15px] ${!notif.isRead ? 'text-indigo-900' : 'text-slate-700'}`}>
-                      {notif.title}
+                      {notif.title} {/* notif is already typed as Doc<"notifications"> */}
                       {notif.priority === 'high' && <span className="mr-2 text-[9px] bg-rose-500 text-white px-2 py-0.5 rounded-full animate-pulse">هام جداً</span>}
                     </h3>
                     <span className="text-[10px] font-bold text-slate-400 tabular-nums">

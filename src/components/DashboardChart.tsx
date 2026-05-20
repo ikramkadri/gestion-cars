@@ -46,8 +46,8 @@ const DashboardChart = () => {
       </div>
 
       {/* الحل البرمجي: تغليف المكون بـ div له ارتفاع محدد */}
-      <div className="h-[350px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="h-[350px] w-full min-w-0">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
           <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -82,7 +82,12 @@ const DashboardChart = () => {
                 fontSize: '12px'
               }}
               itemStyle={{ color: '#3b82f6' }}
-              formatter={(value: any) => [`${Number(value).toLocaleString()} دج`, "الإيرادات"]}
+              formatter={(value: number | string | undefined) => {
+                if (value === undefined) {
+                  return ['N/A', "الإيرادات"];
+                }
+                return [`${Number(value).toLocaleString()} دج`, "الإيرادات"];
+              }}
               labelStyle={{ marginBottom: '4px', color: '#94a3b8' }}
             />
             <Area

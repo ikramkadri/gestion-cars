@@ -30,7 +30,7 @@ const NotificationBell = () => {
     try {
       await markAsRead({ token, notificationId: id });
     } catch (error) {
-      console.error("خطأ في تحديد الإشعار كمقروء:", error);
+      console.error("خطأ في تحديد الإشعار كمقروء:", error); // error is implicitly any
     }
   };
 
@@ -38,8 +38,8 @@ const NotificationBell = () => {
     try {
       await markAllAsRead({ token });
       toast.success("تم تحديد الكل كمقروء");
-    } catch (error) {
-      console.error("خطأ في تحديد الكل كمقروء:", error);
+    } catch (error: unknown) {
+      console.error("خطأ في تحديد الكل كمقروء:", error); // error is implicitly any
     }
   };
 
@@ -89,7 +89,7 @@ const NotificationBell = () => {
                 <span className="text-xs font-bold text-slate-400">جاري التحميل...</span>
               </div>
             ) : notifications.length === 0 ? (
-              <div className="p-12 text-center flex flex-col items-center gap-4">
+              <div className="p-12 text-center flex flex-col items-center gap-4"> {/* n is already typed as Doc<"notifications"> */}
                 <div className="w-16 h-16 bg-slate-50 dark:bg-white/5 rounded-full flex items-center justify-center text-slate-300">
                    <Bell size={32} />
                 </div>

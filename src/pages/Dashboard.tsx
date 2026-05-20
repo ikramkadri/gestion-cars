@@ -1,15 +1,15 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Car, DollarSign, TrendingUp, Activity, Package, CheckCircle2 } from 'lucide-react';
-import { Doc } from "../../convex/_generated/dataModel";
-import { SaleWithDetails } from '../types/app'; // Removed unused imports
+import { SaleWithDetails } from '../types/app';
 import DashboardChart from '../components/DashboardChart';
+import { Doc } from '../../convex/_generated/dataModel';
 import StatsCard from '../components/StatsCard';
-type ActivityLogWithUserName = Doc<"activity_logs"> & { userName: string; };
-type SaleWithCarAndCustomerName = SaleWithDetails;
+import { useLanguage } from './LanguageContext';
 
 const Dashboard = () => {
   const token = localStorage.getItem("convex_token") ?? undefined;
+  const { t, lang } = useLanguage();
   // جلب بيانات المستخدم الحالي لمعرفة الرتبة والاسم
   const user = useQuery(api.users.viewer, { token }); // يجب أن يكون token هنا هو token أو undefined
 
@@ -17,22 +17,24 @@ const Dashboard = () => {
   const stats = useQuery(api.statistics.getDashboardStats, { token: token || undefined });
   
   // 2. ربط أحدث المبيعات (أخذ آخر 5 مبيعات)
-  const recentSales = useQuery(api.sales.getRecentSales, { limit: 5 });
+  const recentSales = useQuery(api.sales.getRecentSales, { token: token || undefined, limit: 5 });
 
   // 3. ربط سجل النشاطات (Activity Feed)
   const latestLogs = useQuery(api.activity_logs.getLatestLogs, { token });
 
   if (!stats) return <div className="p-10 text-center font-bold">جاري تحميل البيانات...</div>;
 
+  const welcomeMsg = user?.role === 'admin' ? t('welcome_admin') : 
+                   user?.role === 'sales_manager' ? `${t('welcome_sales')}, ${user.fullName.split(' ')[0]}` :
+                   `Welcome to MOTORIX, ${user?.fullName || ''}`;
+
   return (
-    <div className="min-h-screen bg-[#F8F9FD] p-8 font-sans" dir="rtl">
+    <div className="min-h-screen bg-[#F8F9FD] p-8 font-sans" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       {/* الـ Header */}
       <div className="flex justify-between items-center mb-10">
         <div>
           <h1 className="text-3xl font-black text-slate-900 leading-tight">
-            {user?.role === 'admin' ? 'لوحة التحكم القيادية 👑' : 
-             user?.role === 'sales_manager' ? `أهلاً بك بطل المبيعات، ${user.fullName.split(' ')[0]} 🚀` :
-             `مرحباً بك في MOTORIX، ${user?.fullName || ''} 👋`}
+            {welcomeMsg}
           </h1>
           <p className="text-slate-500 font-bold mt-2">
             {user?.role === 'sales_manager' ? 'إليك ملخص إنجازاتك الشخصية لهذا اليوم.' : 'نظرة عامة على أسطول السيارات والنشاط التجاري.'}
@@ -50,9 +52,9 @@ const Dashboard = () => {
             icon={DollarSign} 
             color="bg-indigo-600" 
             bg="bg-indigo-600"
-            label={user?.role === 'admin' ? "إجمالي مبيعات المعرض" : "حجم مبيعاتك الشخصية"}
+            label={t('total_sales')}
             val={stats.financials.totalRevenue.toLocaleString()}
-            unit="د.ج"
+            unit={lang === 'ar' ? 'د.ج' : 'DZD'}
           />
         )}
         {user?.role === 'admin' && ( // خصوصية الأرباح للأدمن فقط
@@ -105,13 +107,13 @@ const Dashboard = () => {
             <Activity size={20} className="text-indigo-600" /> سجل النشاطات
           </h3>
           <div className="space-y-6">
-            {latestLogs?.map((log: ActivityLogWithUserName) => (
+            {latestLogs?.map((log: Doc<"activity_logs"> & { userName: string }) => (
               <div key={log._id} className="flex gap-4 items-start relative pb-6 border-r-2 border-slate-50 last:border-0 pr-4">
                 <div className="absolute -right-[9px] top-0 w-4 h-4 rounded-full bg-white border-4 border-indigo-500" />
                 <div className="flex-1">
                   <div className="flex justify-between items-center mb-1">
                     <p className="text-sm font-black text-slate-800">{log.userName}</p>
-                    <span className="text-[10px] text-slate-400 font-bold">{new Date(log.timestamp).toLocaleTimeString('ar-DZ')}</span>
+                    <span className="text-[10px] text-slate-400 font-bold">{new Date(log.createdAt).toLocaleTimeString('ar-DZ')}</span>
                   </div>
                   <p className="text-xs text-slate-500 font-medium leading-relaxed">
                     {log.action === "SALE_CREATED" ? "أتم عملية بيع جديدة" : "قام بتحديث بيانات النظام"}
@@ -144,7 +146,7 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {recentSales?.map((sale: SaleWithCarAndCustomerName) => (
+              {recentSales?.map((sale: SaleWithDetails) => (
                 <tr key={sale._id} className="hover:bg-slate-50 transition-all group">
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-3">

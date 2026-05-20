@@ -190,9 +190,10 @@ export const seedCars = mutation({
       ]);
       await ctx.db.insert("cars", {
         ...car,
+        searchName: `${car.make} ${car.model} ${car.year}`.toLowerCase(),
         sellerId: adminId,
         mainImage: mainImageId,
-        images: imageIds,
+        images: imageIds, // التأكد من أن images ليست undefined
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });

@@ -51,10 +51,14 @@ export default defineSchema({
     fullName: v.string(),
     email: v.string(),
     password: v.string(),
+    phone: v.optional(v.string()),   // إضافة رقم الهاتف للمستخدم
+    address: v.optional(v.string()), // إضافة الحقل المفقود ليطابق users.ts
     profileImageId: v.optional(v.id("_storage")),
     role: v.union(v.literal("admin"), v.literal("sales_manager"), v.literal("viewer")),
     status: v.string(), // active, suspended, etc.
     verified: v.boolean(),
+    verificationToken: v.optional(v.string()), // توكن تأكيد الإيميل
+    verificationTokenExpires: v.optional(v.number()), // تاريخ انتهاء التوكن
     lastLogin: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -68,9 +72,11 @@ export default defineSchema({
     identityNum: v.optional(v.string()), // إعادة حقل رقم الهوية (اختياري)
     status: v.string(), // إضافة حقل الحالة: (مثل: "خالص"، "دين")
     totalPurchases: v.number(), // إضافة حقل إجمالي المشتريات كـ رقم
+    userId: v.optional(v.id("users")), // ربط اختياري بحساب المستخدم الرقمي
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_phone", ["phone"]),
+  }).index("by_phone", ["phone"])
+    .index("by_user", ["userId"]),
 
   sales: defineTable({
     invoiceNumber: v.string(),
@@ -104,16 +110,33 @@ export default defineSchema({
 
   bookings: defineTable({
     carId: v.id("cars"),
-    userId: v.id("users"),
+    userId: v.optional(v.id("users")), // جعل المستخدم اختيارياً لدعم الـ Guest
     bookingDate: v.number(),
-    status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("cancelled"), v.literal("rejected")),
+    bookingReference: v.string(),    // مرجع الحجز (e.g., MTX-1234)
+    customerPhone: v.string(),       // رقم الهاتف (ضروري جداً للاتصال/واتساب)
+    customerLocation: v.string(),    // ولاية الزبون
+    guestName: v.optional(v.string()), // اسم الزبون في حال لم يسجل
+    inspectionDate: v.optional(v.number()), // موعد المعاينة المختار
+    message: v.optional(v.string()), // رسالة قصيرة (مثلاً: أريد المقايضة)
+    status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("cancelled"), v.literal("rejected"), v.literal("archived")), // إضافة حالة "archived"
+    verificationMethod: v.optional(v.union(v.literal("phone_call"), v.literal("whatsapp"), v.literal("manual"))),
+    bookingSource: v.optional(v.union(v.literal("website"), v.literal("whatsapp"), v.literal("phone_call"), v.literal("facebook"))),
     rejectionReason: v.optional(v.string()), // حقل سبب الرفض
     createdAt: v.number(),
     updatedAt: v.number(), // إضافة حقل updatedAt هنا
   })
   .index("by_car", ["carId"])
   .index("by_user", ["userId"])
-  .index("by_status", ["status"]),
+  .index("by_status", ["status"])
+  .index("by_phone", ["customerPhone"])
+  .index("by_createdAt", ["createdAt"]), // إضافة فهرس لتسريع عمليات التنظيف
+
+  blocked_phones: defineTable({
+    phone: v.string(),
+    reason: v.optional(v.string()),
+    blockedBy: v.id("users"),
+    createdAt: v.number(),
+  }).index("by_phone", ["phone"]),
 
   notifications: defineTable({
     userId: v.optional(v.id("users")), // معرف المستلم (اختياري للزبائن، فارغ للإدارة)
@@ -121,36 +144,23 @@ export default defineSchema({
     message: v.string(),
     type: v.union(v.literal("info"), v.literal("success"), v.literal("warning"), v.literal("error"), v.literal("reservation"), v.literal("system")),
     priority: v.optional(v.union(v.literal("low"), v.literal("medium"), v.literal("high"))), // جعل حقل الأولوية اختيارياً
-    isRead: v.boolean(),
+    isRead: v.boolean(), // isRead is already defined
     actionUrl: v.optional(v.string()), // الرابط الذي يوجه إليه الإشعار
+    actionType: v.optional(v.string()), // "APPROVE_USER" نوع الإجراء مثل
+    targetId: v.optional(v.string()),   // معرف السجل المستهدف (مثل معرف المستخدم)
     createdAt: v.number(),
   }).index("by_read_status", ["isRead"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_createdAt", ["createdAt"]), // إضافة فهرس لتسريع عمليات التنظيف
 
   activity_logs: defineTable({
     action: v.string(),
     details: v.string(),
     userId: v.id("users"),
-    timestamp: v.number(),
-  }).index("by_user", ["userId"]).index("by_timestamp", ["timestamp"]),
-
-  // جدول المصاريف التشغيلية (Expenses) - ضروري للإحصائيات المالية
-  expenses: defineTable({
-    title: v.string(),
-    category: v.union(
-      v.literal("Rent"),
-      v.literal("Utilities"),
-      v.literal("Salaries"),
-      v.literal("Marketing"),
-      v.literal("Maintenance"),
-      v.literal("Other")
-    ),
-    amount: v.number(),
-    date: v.number(),
-    carId: v.optional(v.id("cars")),
-    addedBy: v.id("users"),
-  }).index("by_category", ["category"])
-    .index("by_date", ["date"]),
+    createdAt: v.number(), // تم تغيير timestamp إلى createdAt ليتوافق مع الفهارس
+  }).index("by_user", ["userId"])
+    .index("by_createdAt", ["createdAt"]) // تم تغيير الفهرس ليتوافق مع createdAt
+    .index("by_createdAt", ["createdAt"]), // إضافة فهرس لتسريع عمليات التنظيف
 
   site_settings: defineTable({
     showroomName: v.string(),
@@ -169,4 +179,19 @@ export default defineSchema({
     token: v.string(),
     expires: v.number(),
   }).index("by_token", ["token"]),
-});  
+
+  //  إضافة جدول المراجعات المفقود لحل مشكلة الـ TypeScript تماماً
+  reviews: defineTable({
+    carId: v.id("cars"),
+    userId: v.id("users"),
+    userName: v.string(),
+    rating: v.number(),
+    comment: v.string(),
+    status: v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"), v.literal("archived")),
+    createdAt: v.number(),
+    updatedAt: v.number(), // إضافة حقل updatedAt
+  })
+  .index("by_car", ["carId"])
+  .index("by_status", ["status"])
+  .index("by_createdAt", ["createdAt"]), // إضافة فهرس لتسريع عمليات التنظيف
+});

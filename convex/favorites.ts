@@ -1,39 +1,61 @@
-import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { getAuthenticatedUser } from "./auth"; // استيراد دالة المصادقة الموحدة
+import { v } from "convex/values";
+import { getAuthenticatedUser } from "./auth";
 
+// دالة إضافة/إزالة السيارة من المفضلة
 export const toggleFavorite = mutation({
-  args: { carId: v.id("cars"), token: v.optional(v.string()) },
+  args: { token: v.string(), carId: v.id("cars") },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) throw new Error("يجب تسجيل الدخول للإضافة للمفضلة.");
 
-    const existing = await ctx.db.query("favorites")
-      .withIndex("by_user_car", (q) => q.eq("userId", user._id).eq("carId", args.carId))
-      .unique();
+    const existingFavorite = await ctx.db
+      .query("favorites")
+      .withIndex("by_user_car", (q) =>
+        q.eq("userId", user._id).eq("carId", args.carId)
+      )
+      .first();
 
-    if (existing) {
-      await ctx.db.delete(existing._id);
-      return { status: "removed" };
+    if (existingFavorite) {
+      // السيارة موجودة في المفضلة، نقوم بحذفها
+      await ctx.db.delete(existingFavorite._id);
+      return { status: "removed", favoriteCount: -1 };
     } else {
-      await ctx.db.insert("favorites", { userId: user._id, carId: args.carId, createdAt: Date.now() });
-      return { status: "added" };
+      // السيارة غير موجودة، نقوم بإضافتها
+      await ctx.db.insert("favorites", {
+        userId: user._id,
+        carId: args.carId,
+        createdAt: Date.now(),
+      });
+      return { status: "added", favoriteCount: 1 };
     }
   },
 });
 
+// دالة جلب مفضلات المستخدم الحالي
 export const getMyFavorites = query({
-  args: { token: v.optional(v.string()) },
+  args: { token: v.string() },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
-    if (!user) return []; // إذا لم يكن هناك مستخدم مصادق عليه، لا توجد مفضلات
+    if (!user) return [];
 
-    const favorites = await ctx.db.query("favorites")
+    const favorites = await ctx.db
+      .query("favorites")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .order("desc")
       .collect();
-      
-    const carPromises = favorites.map(f => ctx.db.get(f.carId));
-    const cars = await Promise.all(carPromises);
-    return cars.filter(c => c !== null && !c.isArchived);
+
+    return await Promise.all(
+      favorites.map(async (fav) => ctx.db.get(fav.carId))
+    );
+  },
+});
+
+// دالة جديدة: جلب عدد الإعجابات (المفضلة) لسيارة معينة
+export const getCarFavoriteCount = query({
+  args: { carId: v.id("cars") },
+  handler: async (ctx, args) => {
+    const favorites = await ctx.db.query("favorites").filter((q) => q.eq(q.field("carId"), args.carId)).collect();
+    return favorites.length;
   },
 });

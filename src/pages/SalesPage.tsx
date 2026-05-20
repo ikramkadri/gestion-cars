@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react'; // Removed React import
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { SaleWithDetails } from '../types/app'; // Removed unused imports
+import { SaleWithDetails } from '../types/app';
 import { Plus, Search, Archive, RotateCcw, Printer, Edit3, Wallet, Users, Target, Car, TrendingUp } from 'lucide-react'; // Added TrendingUp
 import InvoiceModal from './InvoiceModal'; 
 import SaleFormModal from '../components/SaleFormModal';
@@ -15,7 +15,13 @@ const SalesPage = () => {
   const [selectedSale, setSelectedSale] = useState<SaleWithDetails | null>(null);
 
   // جلب البيانات الحقيقية من Convex
-  const rawSalesData = useQuery(api.sales.getRecentSales, { token, limit: 100 });
+  // تمرير searchTerm و isArchived إلى الـ Convex query
+  const rawSalesData = useQuery(api.sales.getRecentSales, { 
+    token, 
+    limit: 100,
+    searchTerm: searchTerm.toLowerCase().startsWith("inv-") ? searchTerm : undefined, // فقط إذا كان البحث برقم الفاتورة
+    isArchived: currentTab === "archived",
+  });
   const salesData = useMemo(() => (rawSalesData as SaleWithDetails[]) || [], [rawSalesData]);
 
   const toggleArchive = useMutation(api.sales.toggleSaleArchive);
@@ -24,7 +30,7 @@ const SalesPage = () => {
     return salesData.filter((sale: SaleWithDetails) => {
       const isArchived = sale.isArchived || false;
       const matchesTab = currentTab === "active" ? !isArchived : isArchived;
-
+      // Filtering by customerName and carName is done client-side as Convex query doesn't support it directly without denormalization
       const matchesSearch = 
         sale.customerName.includes(searchTerm) || 
         sale.carName.includes(searchTerm) || 
@@ -32,7 +38,7 @@ const SalesPage = () => {
       return matchesTab && matchesSearch;
     });
   }, [salesData, searchTerm, currentTab]);
-
+  
   const stats = useMemo(() => {
     const total = salesData.reduce((acc: number, curr: SaleWithDetails) => acc + curr.amountPaid, 0);
     const totalProfit = salesData.reduce((acc: number, curr: SaleWithDetails) => acc + (curr.profit || 0), 0);
@@ -46,7 +52,7 @@ const SalesPage = () => {
   }, [salesData]);
 
   return (
-    <div className="min-h-screen bg-[#F8F9FD] p-8 font-sans" dir="rtl">
+    <div className="min-h-screen bg-[#F8F9FD] p-8 font-sans" dir="rtl"> {/* stats is already typed */}
       {/* Header */}
       <div className="flex justify-between items-center mb-10">
         <div>
@@ -119,7 +125,7 @@ const SalesPage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredData.length > 0 ? filteredData.map((sale) => (
+              {filteredData.length > 0 ? filteredData.map((sale: SaleWithDetails) => (
                 <tr key={sale._id} className="hover:bg-slate-50 transition-all group">
                   <td className="px-8 py-5 font-black text-indigo-600 text-sm">{sale.invoiceNumber}</td>
                   <td className="px-8 py-5">

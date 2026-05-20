@@ -1,4 +1,4 @@
-import { mutation, query, action, internalMutation, internalQuery, MutationCtx, QueryCtx } from "./_generated/server";
+import { mutation, query, action, internalAction, internalMutation, internalQuery, MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth";
 import { internal } from "./_generated/api";
@@ -39,23 +39,33 @@ export const storeUser = mutation({
       updatedAt: now,
     });
 
-    // إرسال إشعار للأدمن عند انضمام مستخدم جديد
-    if (!user.status && !isAdminEmail) {
+    // التحقق مما إذا كان المستخدم قد تم الترحيب به مسبقاً لمنع التكرار
+    const alreadyWelcomed = await ctx.db
+      .query("notifications")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .filter((q) => q.eq(q.field("title"), "أهلاً بك في MOTORIX! 👋"))
+      .first();
+
+    // إرسال إشعارات الترحيب والمراجعة للمستخدمين الجدد فقط (غير الأدمن)
+    if (!alreadyWelcomed && user.status === "pending" && !isAdminEmail) {
+      // 1. إشعار للأدمن
       await ctx.db.insert("notifications", {
-        title: "مستخدم جديد انضم إلينا ✨",
-        message: `سجل ${user.fullName} حساباً جديداً في المنصة.`,
+        title: "طلب تفعيل حساب جديد 👤",
+        message: `سجل ${user.fullName} حساباً جديداً وهو بانتظار مراجعتك وتفعيلك للمباشرة بالحجز.`,
         type: "system",
+        actionType: "APPROVE_USER",
+        targetId: user._id,
         priority: "low",
         isRead: false,
         createdAt: now,
       });
 
-      // إرسال إشعار ترحيبي فوري للمستخدم الجديد (الزائر)
+      // 2. إشعار ترحيبي للزبون يخبره أن الحساب قيد المراجعة
       await ctx.db.insert("notifications", {
         userId: user._id,
         title: "أهلاً بك في MOTORIX! 👋",
         message: `مرحباً ${user.fullName}، تم إنشاء حسابك بنجاح. حسابك الآن قيد المراجعة، سنقوم بتفعيله قريباً لتتمكن من إتمام حجوزاتك.`,
-        type: "info",
+        type: "reservation",
         priority: "low",
         isRead: false,
         createdAt: now,
@@ -75,6 +85,10 @@ export const approveUser = mutation({
     const admin = await getDbUser(ctx, args.token);
     if (!admin || admin.role !== "admin") throw new Error("غير مصرح لك.");
 
+    // جلب بيانات المستخدم قبل التفعيل للحصول على الإيميل والاسم
+    const targetUser = await ctx.db.get(args.userId);
+    if (!targetUser) throw new Error("المستخدم غير موجود.");
+
     const now = Date.now();
     await ctx.db.patch(args.userId, { status: "active", verified: true, updatedAt: now });
 
@@ -88,6 +102,58 @@ export const approveUser = mutation({
       isRead: false,
       createdAt: now,
     });
+
+    // إرسال بريد إلكتروني ترحيبي للزبون بعد التفعيل
+    await ctx.scheduler.runAfter(0, internal.users.sendWelcomeEmail, {
+      toEmail: targetUser.email,
+      customerName: targetUser.fullName,
+    });
+  },
+});
+
+/**
+ * دالة شاملة لتشغيل إشعارات المستخدم الجديد (إيميل + هاتف)
+ */
+export const triggerNewUserNotifications = internalAction({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const user = await ctx.runQuery(internal.auth.getUserByIdInternal, { userId: args.userId });
+    if (!user) return;
+
+    // 1. إرسال إيميل رابط التأكيد
+    const verificationLink = `https://motorix.dz/verify-email?token=${user.verificationToken}`;
+    console.log(`[EMAIL] To: ${user.email} | Link: ${verificationLink}`);
+    // هنا يتم الربط مع Resend أو SendGrid مستقبلاً
+
+    // 2. إرسال إشعار ترحيبي للهاتف (SMS أو WhatsApp)
+    if (user.phone) {
+      console.log(`[PHONE] Sending welcome notification to: ${user.phone}`);
+      // ملاحظة: هنا يمكنك استدعاء API خارجي مثل Twilio أو Infobip
+      // نص الرسالة المقترح:
+      // "مرحباً بك في MOTORIX! تم استلام طلب تسجيلك بنجاح. يرجى مراجعة بريدك الإلكتروني لتأكيد الحساب."
+    }
+  },
+});
+
+/**
+ * دالة داخلية لإرسال بريد إلكتروني ترحيبي عند تفعيل الحساب.
+ * لا يمكن استدعاؤها مباشرة من الواجهة الأمامية.
+ */
+export const sendWelcomeEmail = internalAction({
+  args: {
+    toEmail: v.string(),
+    customerName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    console.log(`Sending Welcome Email to: ${args.toEmail}`);
+    
+    // ملاحظة: هنا يمكنك دمج خدمة إرسال بريد حقيقية (مثل Resend أو SendGrid)
+    // حالياً نكتفي بطباعة العملية في السجل (Console)
+    console.log(`Subject: تم تفعيل حسابك في MOTORIX 🎉`);
+    console.log(`Body: مرحباً ${args.customerName}, تم تفعيل حسابك بنجاح. يمكنك الآن استكشاف وحجز سياراتك المفضلة.`);
+    
+    // مثال للربط مع خدمة خارجية مستقبلاً:
+    // await fetch("https://api.resend.com/emails", { ... });
   },
 });
 
@@ -99,6 +165,8 @@ export const updateUser = mutation({
   args: {
     fullName: v.optional(v.string()),
     profileImageId: v.optional(v.id("_storage")),
+    phone: v.optional(v.string()), // إضافة رقم الهاتف
+    address: v.optional(v.string()), // إضافة العنوان
     token: v.optional(v.string()),
   },
   handler: async (ctx, args) => {

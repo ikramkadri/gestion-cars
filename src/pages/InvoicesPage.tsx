@@ -12,13 +12,19 @@ const InvoicesPage = () => {
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
 
   // جلب كافة المبيعات المسجلة كفواتير
-  const salesData = useQuery(api.sales.getRecentSales, { token, limit: 200 }) as SaleWithDetails[] | undefined;
+  // تمرير searchTerm إلى الـ Convex query
+  const salesData = useQuery(api.sales.getRecentSales, { 
+    token, 
+    limit: 200,
+    searchTerm: searchTerm.toLowerCase().startsWith("inv-") ? searchTerm : undefined, // فقط إذا كان البحث برقم الفاتورة
+    isArchived: false, // الفواتير النشطة فقط
+  }) as SaleWithDetails[] | undefined;
 
   const filteredInvoices = useMemo(() => {
-    return salesData?.filter(sale => 
-      sale.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sale.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      sale.carName.toLowerCase().includes(searchTerm.toLowerCase())
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    return salesData?.filter(sale =>
+      sale.customerName.toLowerCase().includes(lowerCaseSearchTerm) ||
+      sale.carName.toLowerCase().includes(lowerCaseSearchTerm)
     ) || [];
   }, [salesData, searchTerm]);
 
@@ -49,7 +55,7 @@ const InvoicesPage = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredInvoices.map((invoice) => (
+        {filteredInvoices.map((invoice: SaleWithDetails) => (
           <div key={invoice._id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all group">
             <div className="flex justify-between items-start mb-6">
               <div className="bg-pink-50 text-pink-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase">

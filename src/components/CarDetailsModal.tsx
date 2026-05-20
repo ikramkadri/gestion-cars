@@ -12,7 +12,7 @@ interface CarDetailsModalProps {
 }
 
 const CarDetailsModal = ({ car, isOpen, onClose }: CarDetailsModalProps) => {
-  const siteSettings = useQuery(api.siteSettings.getSiteSettings);
+  const siteSettings = useQuery(api.site_settings.getSettings); // Corrected API path
 
   if (!isOpen) return null;
 

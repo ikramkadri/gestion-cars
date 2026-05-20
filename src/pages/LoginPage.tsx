@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAction } from "convex/react"; // تغيير useMutation إلى useAction
 import { api } from "../../convex/_generated/api";
-import { Mail, Lock, Loader2, ArrowLeft, Zap, User } from "lucide-react"; // ArrowLeft أفضل للـ RTL
+import { Mail, Lock, Loader2, ArrowLeft, Zap, User, X } from "lucide-react"; // ArrowLeft أفضل للـ RTL
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from 'react-hot-toast';
 
@@ -31,7 +31,7 @@ export default function LoginPage() {
       
       if (result?.token) {
         localStorage.setItem("convex_token", result.token);
-        toast.success(flow === "signIn" ? "تم تسجيل الدخول بنجاح!" : "تم إنشاء الحساب بنجاح!");
+        toast.success(flow === "signIn" ? "تم تسجيل الدخول بنجاح!" : "تم إنشاء الحساب! يرجى مراجعة بريدك لتأكيده.");
         
         // العودة للصفحة السابقة إذا وجدت، أو الذهاب للوحة التحكم افتراضياً
         const from = location.state?.from || "/admin";
@@ -56,7 +56,14 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6" dir="rtl">
-      <div className="w-full max-w-md bg-white rounded-[2.5rem] p-8 shadow-2xl">
+      <div className="w-full max-w-md bg-white rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
+        {/* زر الإغلاق للعودة للموقع */}
+        <button 
+          onClick={() => navigate('/')} 
+          className="absolute top-6 left-6 p-2 text-slate-400 hover:text-slate-900 transition-colors z-10"
+        >
+          <X size={24} />
+        </button>
         
         <div className="flex flex-col items-center mb-8">
           <div className="p-4 bg-indigo-600 rounded-3xl text-white mb-4 shadow-xl shadow-indigo-200">

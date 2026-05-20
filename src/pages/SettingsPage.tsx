@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
-import { Lock, Save, ShieldCheck, AlertCircle, Camera, Loader2, User, Calendar, Clock, Car } from 'lucide-react';
+import { Lock, Save, ShieldCheck, AlertCircle, Camera, Loader2, User, Calendar, Clock, Car, Image as ImageIcon, Store } from 'lucide-react';
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { BookingWithDetails } from '../types/app'; // Import from types/app
+import { toast } from 'react-hot-toast'; // Import toast
 
 export default function SettingsPage() {
   const token = localStorage.getItem("convex_token") ?? undefined;
@@ -13,13 +14,24 @@ export default function SettingsPage() {
   // جلب حجوزات المستخدم
   const myBookings = useQuery(api.bookings.getMyBookings, token ? { token } : "skip");
 
+  // إعدادات الموقع
+  const settings = useQuery(api.site_settings.getSettings);
+
+  // جلب رابط اللوغو بشكل صحيح (قاعدة: لا تضع useQuery داخل الـ return)
+  const logoImageUrl = useQuery(api.files.getImageUrl, 
+    settings?.logoImageId ? { storageId: settings.logoImageId } : "skip"
+  );
+
   // Mutations
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl); // Corrected path
+  const generateUploadUrl = useMutation(api.cars.generateUploadUrl); // Corrected path to api.cars
   const updateUser = useMutation(api.users.updateUser);
   const changePassword = useAction(api.users.changePassword); // تغيير useMutation إلى useAction
+  const updateSettings = useMutation(api.site_settings.updateSettings); // No longer needs 'as any' after creating convex/site_settings.ts
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [passwords, setPasswords] = useState({
     current: '',
@@ -33,12 +45,12 @@ export default function SettingsPage() {
     setStatus(null);
     
     if (passwords.new !== passwords.confirm) {
-      setStatus({ type: 'error', msg: 'كلمة المرور الجديدة غير متطابقة' });
+      toast.error('كلمة المرور الجديدة غير متطابقة');
       return;
     }
 
     if (!token) {
-      setStatus({ type: 'error', msg: 'كلمة المرور الجديدة غير متطابقة' });
+      toast.error('لا يوجد توكن مصادقة');
       return;
     }
 
@@ -51,10 +63,10 @@ export default function SettingsPage() {
       });
       
       setStatus({ type: 'success', msg: 'تم تحديث كلمة المرور بنجاح!' });
-      setPasswords({ current: '', new: '', confirm: '' }); // تنظيف الحقول
-    } catch (err: unknown) {
-      const error = err as Error;
-      const msg = error.message || 'فشل تحديث كلمة المرور';
+      setPasswords({ current: '', new: '', confirm: '' }); // Clear fields
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'فشل تحديث كلمة المرور';
+      toast.error(msg);
       setStatus({ type: 'error', msg });
     } finally {
       setIsSavingPassword(false);
@@ -99,8 +111,75 @@ export default function SettingsPage() {
     }
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingLogo(true);
+    try {
+      const postUrl = await generateUploadUrl({ token });
+      const result = await fetch(postUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      const { storageId } = await result.json();
+
+      await updateSettings({ 
+        token,
+        logoImageId: storageId 
+      });
+
+      toast.success("تم تحديث شعار المعرض بنجاح ✨");
+    } catch {
+      toast.error("فشل رفع الشعار");
+    } finally {
+      setIsUploadingLogo(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 text-right" dir="rtl">
+      
+      {/* قسم هوية المعرض (للأدمن فقط) */}
+      {user?.role === 'admin' && (
+        <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 mb-8">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="p-3 bg-blue-600 text-white rounded-2xl">
+              <Store size={24} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-slate-900">هوية المعرض</h2>
+              <p className="text-slate-500 font-medium text-sm">تحكم في الشعار والاسم التجاري</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-8 bg-slate-50 p-6 rounded-3xl border border-dashed border-slate-200">
+            <div className="relative">
+              <div className="w-24 h-24 bg-white rounded-2xl border-2 border-white shadow-md flex items-center justify-center overflow-hidden">
+                {logoImageUrl ? (
+                  <img src={logoImageUrl} className="w-full h-full object-contain" alt="Logo" />
+                ) : (
+                  <ImageIcon size={40} className="text-slate-200" />
+                )}
+                {isUploadingLogo && <div className="absolute inset-0 bg-white/60 flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>}
+              </div>
+              <button 
+                onClick={() => logoInputRef.current?.click()}
+                className="absolute -bottom-2 -left-2 p-2 bg-blue-600 text-white rounded-lg shadow-lg hover:scale-110 transition-all"
+              >
+                <Camera size={14} />
+              </button>
+              <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={handleLogoUpload} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-black text-slate-800 text-lg">{settings?.showroomName || "MOTORIX"}</h3>
+              <p className="text-slate-400 text-xs font-bold mt-1 uppercase tracking-widest">Official Brand Logo</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* قسم البروفايل */}
       <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 mb-8 flex flex-col md:flex-row items-center gap-8">
         <div className="relative group">
@@ -158,17 +237,17 @@ export default function SettingsPage() {
           <p className="text-center text-slate-400 font-bold py-10 italic">ليس لديك أي حجوزات حالياً.</p>
         ) : (
           <div className="space-y-4">
-            {myBookings.map((booking: BookingWithDetails) => (
+            {myBookings.map((booking: BookingWithDetails) => booking && (
               <div key={booking._id} className="flex flex-col md:flex-row items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:shadow-md transition-all gap-4">
                 <div className="flex items-center gap-4 w-full md:w-auto">
                   <div className="w-16 h-12 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm">
                     <Car size={24} />
                   </div>
                   <div>
-                    <h3 className="font-black text-slate-900">{booking.car?.make} {booking.car?.model}</h3>
+                    <h3 className="font-black text-slate-900">{booking.carDetails?.make} {booking.carDetails?.model}</h3>
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mt-1">
                       <Calendar size={14} />
-                      <span>{new Date(booking.bookingDate).toLocaleDateString('ar-DZ')}</span>
+                      <span>{booking.inspectionDate ? new Date(booking.inspectionDate).toLocaleDateString('ar-DZ') : 'لم يحدد'}</span>
                     </div>
                   </div>
                 </div>

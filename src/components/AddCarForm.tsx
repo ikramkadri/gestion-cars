@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  Car, MapPin, CheckCircle2, AlertTriangle,
+  Car, MapPin, CheckCircle2, AlertTriangle, X,
   ChevronLeft, ChevronRight,
-  Loader2, AlertCircle,
-  Settings2, Palette,
-  Zap, Info, Trash2, Camera, Plus, MousePointerClick, TrendingUp, TrendingDown, Search, Pipette, X
+  Loader2, AlertCircle, Settings2, Palette,
+  Zap, Info, Trash2, Camera, Plus, MousePointerClick, TrendingUp, TrendingDown, Search, Pipette
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { CarType } from '../features/cars/types/car.types';
@@ -47,7 +46,7 @@ const TRANSMISSIONS = ["Automatic", "Manual"];
 const DRIVETRAINS = ["FWD", "RWD", "AWD", "4WD"];
 
 // تعريف نوع حالة السيارة بناءً على Convex schema
-type CarCondition = "New" | "Excellent" | "Good" | "Fair" | "Poor";
+export type CarCondition = "New" | "Excellent" | "Good" | "Fair" | "Poor";
 
 // تعريف الواجهة لضمان توافق المسارات والبيانات مع الصفحة الرئيسية
 export interface CarFormData {
@@ -138,7 +137,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ label, value, onC
 
 // تعريف نوع الصورة للمعاينة والرفع
 interface ImageItem {
-  storageId: string;
+  storageId: Id<"_storage">;
   url: string;
 }
 
@@ -182,7 +181,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     engineSize: initialData?.engineSize || '',
     mainImage: initialData?.mainImage || undefined,
     images: initialData?.images || undefined,
-  }); // استخدام initialData لتهيئة formData
+  });
 
   // تحميل الصور الموجودة واللون في حال التعديل
   useEffect(() => {
@@ -200,7 +199,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
       }
       setUploadedImages(initialImages);
       if (initialData.color) {
-        setTempColor(initialData.color); // Use initialData.color directly
+        setTempColor(initialData.color);
         setIsColorConfirmed(true);
       }
     }
@@ -213,8 +212,8 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     if (isColorConfirmed && formData.condition) steps.push(2);
     if (formData.price > 0 && formData.location && formData.fuel && formData.transmission && formData.drivetrain) steps.push(3); // إضافة تحقق للحقول الجديدة
     if (uploadedImages.length > 0) steps.push(4);
-    return steps; 
-  }, [formData, isColorConfirmed, uploadedImages.length]); // Added dependencies
+    return steps;
+  }, [formData, isColorConfirmed, uploadedImages.length]);
   
   const nextStep = () => {
     // التحقق من الخطوة الحالية قبل الانتقال
@@ -239,42 +238,70 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
       return;
     }
 
-    setErrors({}); // Clear errors on successful step
-    setCurrentStep((prev: number) => prev + 1); // Use functional update and type prev
+    setErrors({});
+    setCurrentStep((prev: number) => prev + 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const prevStep = () => {
-    setCurrentStep((prev: number) => prev - 1); // Use functional update and type prev
+    setCurrentStep((prev: number) => prev - 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // دالة مساعدة لضغط الصور قبل الرفع
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200; // أقصى عرض كافٍ للويب
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH;
+          canvas.height = img.height * scaleSize;
+          
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          
+          canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else resolve(file); // Fallback
+          }, 'image/jpeg', 0.7); // ضغط بجودة 70%
+        };
+      };
+    });
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+    const files = e.target.files; 
     if (!files || files.length === 0) return;
     
     setIsUploading(true); // Correctly using setIsUploading
 
     try {
       for (const file of Array.from(files)) {
+        const compressedBlob = await compressImage(file);
         const postUrl = await generateUploadUrl();
         const result = await fetch(postUrl, { 
           method: "POST", 
-          headers: { "Content-Type": file.type }, 
-          body: file 
+          headers: { "Content-Type": 'image/jpeg' }, 
+          body: compressedBlob 
         });
         const { storageId } = await result.json();
 
         setUploadedImages((prev: ImageItem[]) => [...prev, { 
-          storageId: storageId as string,
-          url: URL.createObjectURL(file)
+          storageId: storageId as Id<"_storage">,
+          url: URL.createObjectURL(compressedBlob)
         }]);
       }
       toast.success("تم رفع الصور بنجاح");
     } catch {
       toast.error("فشل في رفع الصور");
     } finally {
-      setIsUploading(false); // Ensure loading state is reset
+      setIsUploading(false);
     }
   };
 
@@ -283,7 +310,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
       toast.error("يرجى إضافة صورة واحدة على الأقل");
       return;
     }
-    // دمج بيانات الصور المرفوعة مع بيانات النموذج قبل الإرسال
+    // دمج بيانات الصور المرفوعة مع بيانات النموذج قبل الإرسال (finalData is implicitly typed correctly)
     const finalData = {
       ...formData,
       mainImage: uploadedImages[0]?.storageId, // أول صورة هي الرئيسية إجبارياً
