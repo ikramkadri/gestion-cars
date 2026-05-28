@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { toast } from 'react-hot-toast';
-import { ShoppingBag, Clock, CheckCircle2, FileText, Car, ArrowLeftRight, Loader2, Heart, Star, Send, X } from 'lucide-react';
+import { ShoppingBag, Clock, CheckCircle2, FileText, Car, ArrowLeftRight, Heart } from 'lucide-react';
 import { SaleWithDetails } from '../types/app';
-import InvoiceModal from './InvoiceModal';
+import InvoiceClassic from '../components/InvoiceClassic';
+import DeliveryTrackerModal from '../components/DeliveryTrackerModal';
 import CarCard from '../components/CarCard';
 import { CarType } from '../features/cars/types/car.types';
-import { Id } from '../../convex/_generated/dataModel';
 
 const OrdersPage = () => {
   const token = localStorage.getItem("convex_token") ?? undefined;
@@ -19,41 +18,20 @@ const OrdersPage = () => {
   
   // جلب السيارات المفضلة
   const favorites = useQuery(api.favorites.getMyFavorites, token ? { token } : "skip");
-
   const [selectedSale, setSelectedSale] = useState<SaleWithDetails | null>(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
 
-  // منطق التقييمات
-  const addReview = useMutation(api.reviews.addReview);
-  const [isReviewOpen, setIsReviewOpen] = useState(false);
-  const [reviewData, setReviewData] = useState<{carId: string, carName: string} | null>(null);
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewComment, setReviewComment] = useState("");
+  const [selectedDelivery, setSelectedDelivery] = useState<SaleWithDetails | null>(null);
+  const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
 
+  // معالجة حالة التحميل لضمان عدم وجود أخطاء "undefined"
   if (bookings === undefined || sales === undefined || favorites === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F9FD]">
-        <Loader2 className="animate-spin text-indigo-600" size={40} />
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
-
-  const handleReviewSubmit = async () => {
-    if (!reviewComment.trim()) return toast.error("يرجى كتابة رأيك أولاً");
-    try {
-      await addReview({
-        token: token || "",
-        carId: reviewData?.carId as Id<"cars">,
-        rating: reviewRating,
-        comment: reviewComment,
-      });
-      toast.success("شكراً لك! تقييمك يساهم في تحسين خدماتنا 🌟");
-      setIsReviewOpen(false);
-      setReviewComment("");
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "فشل إرسال التقييم");
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#F8F9FD] p-8 font-sans text-right" dir="rtl">
@@ -138,12 +116,12 @@ const OrdersPage = () => {
                     <FileText size={14} /> تحميل الفاتورة
                   </button>
                   <button 
-                    onClick={() => { setReviewData({carId: sale.carId, carName: sale.carName}); setIsReviewOpen(true); }}
-                    className="flex items-center gap-2 text-xs font-black text-amber-500 hover:text-amber-400 transition-colors"
+                    onClick={() => {
+                      setSelectedDelivery(sale);
+                      setIsDeliveryOpen(true);
+                    }}
+                    className="flex items-center gap-2 text-xs font-black text-emerald-400 hover:text-emerald-300 transition-colors"
                   >
-                    <Star size={14} fill="currentColor" /> قيم تجربتك
-                  </button>
-                  <button className="flex items-center gap-2 text-xs font-black text-emerald-400 hover:text-emerald-300 transition-colors">
                     <ArrowLeftRight size={14} /> تتبع النقل
                   </button>
                 </div>
@@ -196,56 +174,17 @@ const OrdersPage = () => {
         </div>
       </div>
 
-      <InvoiceModal 
+      <InvoiceClassic 
         isOpen={isInvoiceOpen} 
         onClose={() => setIsInvoiceOpen(false)} 
         sale={selectedSale} 
       />
 
-      {/* مودال التقييم الفاخر */}
-      {isReviewOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-[400px] rounded-[2.5rem] shadow-2xl overflow-hidden relative border-t-[10px] border-amber-400">
-            <button onClick={() => setIsReviewOpen(false)} className="absolute top-5 left-5 p-2 bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-rose-500 rounded-full transition-all border border-slate-100 shadow-sm">
-              <X size={16} />
-            </button>
-            <div className="p-8 text-center border-b border-slate-50">
-              <h3 className="font-black text-xl text-slate-900 flex items-center justify-center gap-2">
-                <Star className="text-amber-500" fill="currentColor" /> قيم سيارتك الجديدة
-              </h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">{reviewData?.carName}</p>
-            </div>
-            <div className="p-8 space-y-6 text-center">
-              <div className="flex justify-center gap-3">
-                {[1, 2, 3, 4, 5].map((num) => (
-                  <button 
-                    key={num} 
-                    onClick={() => setReviewRating(num)}
-                    className={`transition-all hover:scale-125 ${reviewRating >= num ? 'text-amber-500 scale-110' : 'text-slate-200'}`}
-                  >
-                    <Star size={35} fill={reviewRating >= num ? "currentColor" : "none"} strokeWidth={2.5} />
-                  </button>
-                ))}
-              </div>
-              <div className="space-y-2">
-                <label className="text-[11px] font-black text-blue-900 uppercase tracking-wider block text-right">رسالة شكر أو ملاحظة</label>
-                <textarea 
-                  value={reviewComment}
-                  onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder="كيف كانت تجربتك مع فريق موتوريكس؟"
-                  className="w-full p-4 rounded-xl bg-slate-50 border-2 border-slate-100 outline-none focus:border-amber-400 transition-colors font-bold text-sm h-28 resize-none text-right"
-                />
-              </div>
-              <button 
-                onClick={handleReviewSubmit}
-                className="w-full py-4 bg-slate-900 text-white rounded-xl font-black shadow-xl hover:bg-blue-900 transition-all flex items-center justify-center gap-3 active:scale-95"
-              >
-                <Send size={18} /> إرسال التقييم الرسمي
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeliveryTrackerModal 
+        isOpen={isDeliveryOpen} 
+        onClose={() => setIsDeliveryOpen(false)} 
+        sale={selectedDelivery} 
+      />
     </div>
   );
 };

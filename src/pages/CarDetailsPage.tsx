@@ -23,8 +23,8 @@ const CarDetailsPage = () => {
     if (rawCar) {
       return {
         ...rawCar,
-        mainImageUrl: rawCar.mainImageUrl,
-        imagesUrls: rawCar.imageUrls || [], // هنا تظهر بقية الصور
+        mainImageUrl: rawCar.mainImageUrl ?? null,
+        imagesUrls: rawCar.imagesUrls || [], // استخدام التسمية الصحيحة المتفق عليها مع الباك إند
       } as CarType;
     }
     return undefined; 

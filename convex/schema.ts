@@ -80,6 +80,8 @@ export default defineSchema({
 
   sales: defineTable({
     invoiceNumber: v.string(),
+    customerName: v.string(),
+    carName: v.string(),
     carId: v.id("cars"),
     bookingId: v.optional(v.id("bookings")), // ربط البيع بالحجز المحدد
     customerId: v.id("customers"),
@@ -92,11 +94,15 @@ export default defineSchema({
     vin: v.string(),                 // رقم الهيكل وقت البيع
     mileageAtSale: v.number(),       // الكيلومتراج وقت البيع
     paymentMethod: v.union(v.literal("Cash"), v.literal("Bank Transfer"), v.literal("Card"), v.literal("Check")),
+    deliveryStatus: v.optional(v.union(v.literal("processed"), v.literal("quality_check"), v.literal("shipped"), v.literal("delivered"))),
     sellerId: v.id("users"),
     isArchived: v.boolean(),
     createdAt: v.number(),
     updatedAt: v.number(),
-  })
+  }).searchIndex("search_sales", {
+    searchField: "customerName",
+    filterFields: ["isArchived", "invoiceNumber", "carName"] // Add carName to filterFields
+  }) // Add search index for customerName and carName
   .index("by_invoice", ["invoiceNumber"])
   .index("by_car", ["carId"]) 
   .index("by_date", ["saleDate"])
@@ -157,10 +163,9 @@ export default defineSchema({
     action: v.string(),
     details: v.string(),
     userId: v.id("users"),
-    createdAt: v.number(), // تم تغيير timestamp إلى createdAt ليتوافق مع الفهارس
+    createdAt: v.number(),
   }).index("by_user", ["userId"])
-    .index("by_createdAt", ["createdAt"]) // تم تغيير الفهرس ليتوافق مع createdAt
-    .index("by_createdAt", ["createdAt"]), // إضافة فهرس لتسريع عمليات التنظيف
+    .index("by_createdAt", ["createdAt"]),
 
   site_settings: defineTable({
     showroomName: v.string(),

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
-  Gauge, Fuel, Settings, MapPin, Hash, ShieldCheck, Zap, Award, Info, DollarSign,
-  Phone, MessageCircle, CalendarCheck, Heart, Share2, User, Star, ChevronLeft, ChevronRight, X, Send, Palette, Globe, Languages, FileText, Car, Sun, Moon
+  Gauge, Fuel, Settings, MapPin, Hash, ShieldCheck, Zap, Award, Info, DollarSign, Calendar,
+  Phone, MessageCircle, CalendarCheck, Heart, Share2, User, ChevronLeft, ChevronRight, X, Send, Palette, Globe, Languages, FileText, Car, Sun, Moon
 } from 'lucide-react';
 import { CarType } from '../features/cars/types/car.types';
 import { toast } from 'react-hot-toast';
@@ -11,7 +11,6 @@ import { Id } from '../../convex/_generated/dataModel';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLang } from '../lib/LanguageContext';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface CarDetailsContentProps {
   car: CarType;
   siteSettings: {
@@ -42,52 +41,26 @@ const CarDetailsContent = ({ car, siteSettings }: CarDetailsContentProps) => {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { lang } = useLang();
+  const { language: lang } = useLang();
   
   const allImages = useMemo(() => [car.mainImageUrl, ...(car.imagesUrls || [])].filter(Boolean) as string[], [car]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [direction, setDirection] = useState(0);
 
-  // حالات نموذج الحجز السريع (Lead Form)
+  // حالات نموذج الحجز السريع (Lead Form) - تم نقلها هنا لاستخدام availableDates في القيمة الابتدائية
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [bookingForm, setBookingForm] = useState({
     phone: '',
     location: '',
-    inspectionDate: '',
-    inspectionTimeSlot: '', // 'morning' | 'evening'
-    inspectionHour: '', // '09:00' | '10:00' etc.
+    inspectionDate: new Date().toISOString().split('T')[0], // البدء من تاريخ اليوم
+    inspectionTimeSlot: '', 
+    inspectionHour: '', 
     message: ''
   });
-
-  // توليد أيام العمل المقترحة (الأحد - الخميس)
-  const availableDates = useMemo(() => {
-    const days = [];
-    const today = new Date();
-    let offset = 1; // البدء من الغد
-
-    while (days.length < 6) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + offset);
-      const dayOfWeek = date.getDay(); // 0: الأحد, 5: الجمعة, 6: السبت
-      
-      // استبعاد الجمعة والسبت
-      if (dayOfWeek !== 5 && dayOfWeek !== 6) {
-        days.push(new Date(date));
-      }
-      offset++;
-    }
-    return days;
-  }, []);
 
   // تحديد ساعات العمل
   const MORNING_HOURS = ['09:00', '10:00', '11:00'];
   const EVENING_HOURS = ['14:00', '15:00', '16:00'];
-
-  useEffect(() => {
-    if (availableDates.length > 0 && !bookingForm.inspectionDate) {
-      setBookingForm(prev => ({ ...prev, inspectionDate: availableDates[0].toISOString().split('T')[0] }));
-    }
-  }, [availableDates, bookingForm.inspectionDate]);
 
   const token = localStorage.getItem("convex_token") || "";
   const user = useQuery(api.users.viewer, token ? { token } : "skip");
@@ -491,7 +464,13 @@ const CarDetailsContent = ({ car, siteSettings }: CarDetailsContentProps) => {
 
                 <div className="flex flex-col gap-5 w-full md:w-auto">
                    <button 
-                    onClick={() => setIsBookingModalOpen(true)}
+                    onClick={() => {
+                      if (!token) {
+                        toast.error(lang === 'ar' ? "يرجى تسجيل الدخول لإتمام الحجز" : "Veuillez vous connecter pour réserver");
+                        return navigate('/login', { state: { from: location.pathname, pendingCarId: car._id } });
+                      }
+                      setIsBookingModalOpen(true);
+                    }}
                     className="px-16 py-7 bg-blue-600 text-white rounded-[2.5rem] font-black text-2xl shadow-2xl shadow-blue-500/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-4"
                    >
                       <CalendarCheck size={32} /> {ui.viewing}
@@ -558,9 +537,6 @@ const CarDetailsContent = ({ car, siteSettings }: CarDetailsContentProps) => {
                     <div>
                       <h5 className="font-black text-white text-xl">{ui.seller}</h5>
                       <p className="text-base text-slate-500 font-bold italic">Team {siteSettings?.showroomName}</p>
-                      <div className="flex items-center gap-1.5 mt-3">
-                        {[1,2,3,4,5].map(s => <Star key={s} size={14} className="fill-amber-500 text-amber-500" />)}
-                      </div>
                     </div>
                   </div>
 
@@ -651,28 +627,16 @@ const CarDetailsContent = ({ car, siteSettings }: CarDetailsContentProps) => {
                 <div className="space-y-1" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
                   <label className="text-[10px] font-black text-blue-900 dark:text-blue-400 uppercase tracking-wider flex justify-between items-center mb-2">
                     <span>{ui.dateLabel}</span>
-                    <span className="text-[8px] bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded text-blue-600">أيام العمل الرسمية</span>
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {availableDates.map((date) => {
-                      const dateStr = date.toISOString().split('T')[0];
-                      const isSelected = bookingForm.inspectionDate === dateStr;
-                      return (
-                        <button
-                          key={dateStr}
-                          type="button"
-                          onClick={() => setBookingForm({...bookingForm, inspectionDate: dateStr})}
-                          className={`p-3 rounded-xl border-2 transition-all text-[10px] font-bold flex flex-col items-center gap-0.5 ${
-                            isSelected 
-                              ? 'border-[#D4AF37] bg-[#D4AF37]/5 text-blue-900 dark:text-[#D4AF37] shadow-inner' 
-                              : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-white/5 text-slate-500 hover:border-blue-200'
-                          }`}
-                        >
-                          <span className="font-black">{date.toLocaleDateString(lang === 'ar' ? 'ar-DZ' : lang === 'fr' ? 'fr-FR' : 'en-US', { weekday: 'long' })}</span>
-                          <span className="opacity-60">{date.toLocaleDateString(lang === 'ar' ? 'ar-DZ' : lang === 'fr' ? 'fr-FR' : 'en-US', { day: 'numeric', month: 'short' })}</span>
-                        </button>
-                      );
-                    })}
+                  <div className="relative">
+                    <input 
+                      type="date"
+                      min={new Date().toISOString().split('T')[0]} // منع اختيار تواريخ ماضية
+                      value={bookingForm.inspectionDate}
+                      onChange={(e) => setBookingForm({...bookingForm, inspectionDate: e.target.value})}
+                      className="w-full p-4 rounded-xl bg-slate-50 dark:bg-white/5 border-2 border-slate-100 dark:border-white/5 outline-none focus:border-[#D4AF37] transition-all font-black text-sm text-blue-900 dark:text-white appearance-none"
+                    />
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
                   </div>
                 </div>
                 <div className="space-y-1" dir={lang === 'ar' ? 'rtl' : 'ltr'}> {/* Time Slot Selection */}

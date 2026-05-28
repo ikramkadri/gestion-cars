@@ -1,13 +1,13 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { Zap, Sun, Moon, User } from 'lucide-react';
-import { useLang } from '../lib/LanguageContext';
+import { useLanguage } from '../lib/LanguageContext';
 import { useQuery } from 'convex/react';
 import { Id } from '../../convex/_generated/dataModel';
 import { api } from '../../convex/_generated/api';
 
 const Navbar = ({ onOpenAuth }: { onOpenAuth: () => void }) => {
-  const { lang, setLang, theme, toggleTheme, t } = useLang();
-  const [isScrolled, setIsScrolled] = React.useState(false);
+  const { language: lang, setLang, theme, toggleTheme, t } = useLanguage();
+  const [isScrolled, setIsScrolled] = useState(false);
 
   // جلب إعدادات الموقع - يجب استدعاء Hooks في المستوى الأعلى للمكون وليس داخل useEffect
   const settings = useQuery(api.site_settings.getSettings);
@@ -16,7 +16,7 @@ const Navbar = ({ onOpenAuth }: { onOpenAuth: () => void }) => {
     settings?.logoImageId ? { storageId: settings.logoImageId as Id<"_storage"> } : "skip"
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
@@ -47,9 +47,15 @@ const Navbar = ({ onOpenAuth }: { onOpenAuth: () => void }) => {
 
           {/* Links */}
           <div className={`hidden lg:flex gap-6 text-[13px] font-black uppercase ${isScrolled ? 'text-slate-500 dark:text-slate-400' : 'text-white/80'}`}>
-            <a href="#" className="hover:text-blue-500">{t('home')}</a>
-            <a href="#" className="hover:text-blue-500">{t('buy')}</a>
-            <a href="#" className="hover:text-blue-500">{t('news')}</a>
+            <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="hover:text-blue-500 transition-colors uppercase tracking-widest">
+              {t('home')}
+            </button>
+            <button onClick={() => document.getElementById('chatbot-section')?.scrollIntoView({behavior: 'smooth'})} className="hover:text-blue-500 transition-colors uppercase tracking-widest">
+              {t('helpMe')}
+            </button>
+            <button onClick={() => document.getElementById('about-us')?.scrollIntoView({behavior: 'smooth'})} className="hover:text-blue-500 transition-colors uppercase tracking-widest">
+              {t('aboutUs')}
+            </button>
           </div>
         </div>
 

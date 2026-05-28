@@ -2,8 +2,10 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { SaleWithDetails } from '../types/app';
-import { Plus, Search, Archive, RotateCcw, Printer, Edit3, Wallet, Users, Target, Car, TrendingUp } from 'lucide-react'; // Added TrendingUp
-import InvoiceModal from './InvoiceModal'; 
+import { Id } from '../../convex/_generated/dataModel';
+import { Plus, Search, Archive, RotateCcw, Printer, Edit3, Wallet, Users, Target, Car, TrendingUp, Truck } from 'lucide-react'; 
+import { toast } from 'react-hot-toast';
+import InvoiceClassic from '../components/InvoiceClassic'; 
 import SaleFormModal from '../components/SaleFormModal';
 
 const SalesPage = () => {
@@ -19,25 +21,27 @@ const SalesPage = () => {
   const rawSalesData = useQuery(api.sales.getRecentSales, { 
     token, 
     limit: 100,
-    searchTerm: searchTerm.toLowerCase().startsWith("inv-") ? searchTerm : undefined, // فقط إذا كان البحث برقم الفاتورة
+    searchTerm: searchTerm, // Pass searchTerm directly to backend
     isArchived: currentTab === "archived",
   });
   const salesData = useMemo(() => (rawSalesData as SaleWithDetails[]) || [], [rawSalesData]);
 
   const toggleArchive = useMutation(api.sales.toggleSaleArchive);
+  const updateDelivery = useMutation(api.sales.updateDeliveryStatus);
 
-  const filteredData = useMemo(() => {
-    return salesData.filter((sale: SaleWithDetails) => {
-      const isArchived = sale.isArchived || false;
-      const matchesTab = currentTab === "active" ? !isArchived : isArchived;
-      // Filtering by customerName and carName is done client-side as Convex query doesn't support it directly without denormalization
-      const matchesSearch = 
-        sale.customerName.includes(searchTerm) || 
-        sale.carName.includes(searchTerm) || 
-        sale.invoiceNumber.includes(searchTerm);
-      return matchesTab && matchesSearch;
-    });
-  }, [salesData, searchTerm, currentTab]);
+  const handleUpdateDelivery = async (
+    saleId: Id<"sales">, 
+    status: "processed" | "quality_check" | "shipped" | "delivered"
+  ) => {
+    try {
+      await updateDelivery({ token, saleId, status });
+      toast.success("تم تحديث حالة النقل بنجاح 🚚");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "فشل التحديث");
+    }
+  };
+
+  const filteredData = salesData; // No client-side filtering needed now
   
   const stats = useMemo(() => {
     const total = salesData.reduce((acc: number, curr: SaleWithDetails) => acc + curr.amountPaid, 0);
@@ -120,6 +124,7 @@ const SalesPage = () => {
                 <th className="px-8 py-4">الزبون</th>
                 <th className="px-8 py-4">التاريخ</th>
                 <th className="px-8 py-4">طريقة الدفع</th>
+                <th className="px-8 py-4">حالة التتبع</th>
                 <th className="px-8 py-4">المبلغ</th>
                 <th className="px-8 py-4 text-center">الإجراءات</th>
               </tr>
@@ -142,6 +147,25 @@ const SalesPage = () => {
                     <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-[10px] font-black">
                       {sale.paymentMethod}
                     </span>
+                  </td>
+                  <td className="px-8 py-5">
+                    <select 
+                      value={sale.deliveryStatus || 'processed'}
+                      onChange={(e) => handleUpdateDelivery(
+                        sale._id, 
+                        e.target.value as "processed" | "quality_check" | "shipped" | "delivered"
+                      )}
+                      className="bg-slate-50 border-none text-[10px] font-black rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer text-slate-600"
+                    >
+                      <option value="processed">تجهيز الوثائق</option>
+                      <option value="quality_check">فحص الجودة</option>
+                      <option value="shipped">في الطريق</option>
+                      <option value="delivered">تم التسليم</option>
+                    </select>
+                    <div className="mt-1 flex items-center gap-1 opacity-40">
+                       <Truck size={10} />
+                       <span className="text-[8px] font-bold">تتبع حي</span>
+                    </div>
                   </td>
                   <td className="px-8 py-5 font-black text-slate-900 tabular-nums">
                     {sale.amountPaid.toLocaleString()} <span className="text-[10px] text-indigo-500 uppercase">دج</span>
@@ -177,10 +201,10 @@ const SalesPage = () => {
       </div>
 
       {/* Invoice Modal */}
-      <InvoiceModal isOpen={isInvoiceOpen} onClose={() => setIsInvoiceOpen(false)} sale={selectedSale} />
+      <InvoiceClassic isOpen={isInvoiceOpen} onClose={() => setIsInvoiceOpen(false)} sale={selectedSale} />
       
       {/* Sale Form Modal */}
-      <SaleFormModal isOpen={isSaleModalOpen} onClose={() => setIsSaleModalOpen(false)} />
+      <SaleFormModal isOpen={isSaleModalOpen} onClose={() => setIsSaleModalOpen(false)} key={selectedSale?._id || 'new-sale'} />
     </div>
   );
 };

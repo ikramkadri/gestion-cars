@@ -57,8 +57,14 @@ export default function EditCarPage() {
         title={`تعديل: ${car.make} ${car.model}`}
         initialData={{
           ...car,
+          mainImageUrl: car.mainImageUrl ?? null,
           mainImage: car.mainImage || undefined,
           images: car.images || [], // Ensure images is Id<"_storage">[]
+          description: car.description ?? "",
+          vin: car.vin ?? "",
+          origin: car.origin ?? "",
+          engineSize: car.engineSize ?? "",
+          color: car.color ?? "",
         }}
         onSubmit={handleSubmit}
         isLoading={isSubmitting}

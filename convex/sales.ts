@@ -5,6 +5,7 @@
 
 import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { Doc } from "./_generated/dataModel";
 import { getAuthenticatedUser } from "./auth";
 
 export const createSale = mutation({
@@ -13,8 +14,8 @@ export const createSale = mutation({
     bookingId: v.optional(v.id("bookings")), // إضافة الحقل المفقود في الـ Validator
     customerName: v.string(), 
     phone: v.string(), 
-    address: v.optional(v.string()),
-    identityNum: v.optional(v.string()),
+    address: v.string(),
+    identityNum: v.string(),
     amountPaid: v.number(), 
     taxAmount: v.optional(v.number()),
     registrationFees: v.optional(v.number()),
@@ -26,6 +27,12 @@ export const createSale = mutation({
   handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) throw new Error("غير مصرح لك.");
+
+    // منع إدخال نصوص فارغة برمجياً
+    if (!args.customerName.trim()) throw new Error("اسم الزبون لا يمكن أن يكون فارغاً.");
+    if (!args.phone.trim()) throw new Error("رقم الهاتف لا يمكن أن يكون فارغاً.");
+    if (!args.address.trim()) throw new Error("العنوان مطلوب.");
+    if (!args.identityNum.trim()) throw new Error("رقم الهوية NIN مطلوب.");
 
     // صلاحيات الأدمن أو مدير المبيعات فقط
     if (user.role !== "admin" && user.role !== "sales_manager") throw new Error("لا تملك صلاحية البيع.");
@@ -40,34 +47,22 @@ export const createSale = mutation({
     // تحسين الأداء: جلب آخر عملية بيع فقط لتوليد الرقم التالي بدلاً من جلب الكل
     const currentYear = new Date().getFullYear();
     const lastSale = await ctx.db.query("sales").order("desc").first();
-    const lastSequence = lastSale?.invoiceNumber.split('-')[2] || "0000";
+    const lastSequence = lastSale?.invoiceNumber?.split('-')[2] || "0000";
     const sequence = (parseInt(lastSequence) + 1).toString().padStart(4, '0');
     const invoiceNumber = `INV-${currentYear}-${sequence}`;
 
     const customer = await ctx.db.query("customers").withIndex("by_phone", (q) => q.eq("phone", args.phone)).unique();
     
-    // إصلاح خطأ undefined عبر التأكد من وجود القيمة دائماً
-    let customerId;
     if (!customer) {
-      customerId = await ctx.db.insert("customers", { 
-        fullName: args.customerName, 
-        phone: args.phone, 
-        email: "", 
-        address: args.address || "",
-        identityNum: args.identityNum || "",
-        status: "خالص", 
-        totalPurchases: args.amountPaid, 
-        createdAt: now, 
-        updatedAt: now 
-      });
-    } else {
-      customerId = customer._id;
-      // تحديث إجمالي المشتريات للزبون الحالي
-      await ctx.db.patch(customerId, {
-        totalPurchases: (customer.totalPurchases || 0) + args.amountPaid,
-        updatedAt: now
-      });
+      throw new Error("عذراً، هذا الزبون غير مسجل في النظام. يجب فتح حساب للزبون أولاً أو إضافته في قاعدة بيانات الزبائن برقم الهاتف هذا قبل إتمام عملية البيع لضمان التتبع القانوني.");
     }
+
+    const customerId = customer._id;
+    // تحديث إجمالي المشتريات للزبون الحالي
+    await ctx.db.patch(customerId, {
+      totalPurchases: (customer.totalPurchases || 0) + args.amountPaid,
+      updatedAt: now
+    });
 
     await ctx.db.patch(args.carId, { status: "Sold", updatedAt: now });
 
@@ -80,14 +75,19 @@ export const createSale = mutation({
           .withIndex("by_car", (q) => q.eq("carId", args.carId))
           .filter((q) => 
             q.and(
-              q.eq(q.field("status"), "pending"),
+              // التعديل: دعم الحجوزات التي تم تأكيد معاينتها مسبقاً
+              q.or(
+                q.eq(q.field("status"), "pending"),
+                q.eq(q.field("status"), "confirmed")
+              ),
               q.eq(q.field("customerPhone"), args.phone)
             )
           )
           .first();
 
     if (pendingBooking) {
-      await ctx.db.patch(pendingBooking._id, { status: "confirmed", updatedAt: now });
+      // بعد البيع، نحول الحجز إلى حالة نهائية لكي لا يظهر في القوائم النشطة
+      await ctx.db.patch(pendingBooking._id, { status: "archived", updatedAt: now });
       
       if (pendingBooking.userId) {
         // إرسال إشعار للزبون الذي قام بالحجز الأصلي (فقط إذا كان مسجلاً)
@@ -106,6 +106,8 @@ export const createSale = mutation({
     
     const saleId = await ctx.db.insert("sales", {
       invoiceNumber,
+      customerName: args.customerName, // Populate denormalized field
+      carName: car.make + " " + car.model, // Populate denormalized field
       carId: args.carId,
       bookingId: args.bookingId || pendingBooking?._id, // حفظ رابط الحجز في سجل البيع
       customerId: customerId, // الآن TypeScript متأكد أن المعرف متاح
@@ -119,6 +121,7 @@ export const createSale = mutation({
       vin: args.vin || "",
       mileageAtSale: args.mileageAtSale || car.mileage,
       paymentMethod: args.paymentMethod, 
+      deliveryStatus: "processed",
       isArchived: false,
       createdAt: now, 
       updatedAt: now,
@@ -148,6 +151,42 @@ export const toggleSaleArchive = mutation({
 });
 
 /**
+ * تحديث حالة تتبع النقل (للأدمن ومدراء المبيعات)
+ */
+export const updateDeliveryStatus = mutation({
+  args: { 
+    token: v.string(), 
+    saleId: v.id("sales"), 
+    status: v.union(v.literal("processed"), v.literal("quality_check"), v.literal("shipped"), v.literal("delivered")) 
+  },
+  handler: async (ctx, args) => {
+    const user = await getAuthenticatedUser(ctx, args.token);
+    if (!user || (user.role !== "admin" && user.role !== "sales_manager")) throw new Error("صلاحية مطلوبة.");
+
+    const sale = await ctx.db.get(args.saleId);
+    if (!sale) throw new Error("عملية البيع غير موجودة");
+
+    await ctx.db.patch(args.saleId, { deliveryStatus: args.status, updatedAt: Date.now() });
+
+    // إرسال إشعار فوري للزبون عند تحديث رحلة السيارة
+    if (sale.userId) {
+      await ctx.db.insert("notifications", {
+        userId: sale.userId,
+        title: "تحديث تتبع النقل 🚚",
+        message: `تم تحديث حالة توصيل سيارتك إلى: ${
+          args.status === "quality_check" ? "فحص الجودة النهائي" : 
+          args.status === "shipped" ? "في الطريق إليك" : 
+          args.status === "delivered" ? "تم التسليم بنجاح" : "تجهيز الوثائق"
+        }`,
+        type: "info",
+        isRead: false,
+        createdAt: Date.now(),
+      });
+    }
+  },
+});
+
+/**
  * جلب المبيعات الأخيرة مع تفاصيل السيارة والزبون للعرض في لوحة التحكم
  */
 export const getRecentSales = query({
@@ -160,10 +199,9 @@ export const getRecentSales = query({
     let salesQuery = ctx.db.query("sales");
 
     // نظام تصفية الصلاحيات المطور
-    if (user.role === "admin") {
-      // الأدمن يرى كل المبيعات
-    } else if (user.role === "sales_manager") {
-      // مدير المبيعات يرى مبيعاته التي قام بها فقط
+    if (user.role === "admin") { // الأدمن يرى كل المبيعات
+      // No additional filter needed here
+    } else if (user.role === "sales_manager") { // مدير المبيعات يرى مبيعاته التي قام بها فقط
       salesQuery = salesQuery.filter((q) => q.eq(q.field("sellerId"), user._id));
     } else {
       // الزبون يرى المبيعات المرتبطة بـ معرفه أو برقم هاتفه (لضمان ظهور المبيعات اليدوية)
@@ -180,14 +218,25 @@ export const getRecentSales = query({
       salesQuery = salesQuery.filter((q) => q.eq(q.field("isArchived"), args.isArchived));
     }
 
-    // تصفية حسب رقم الفاتورة إذا تم توفير searchTerm
-    // ملاحظة: لا يمكن التصفية مباشرة على customerName أو carName هنا لأنها حقول مشتقة (derived fields)
-    // ستحتاج إلى denormalize (إضافة هذه الحقول مباشرة إلى جدول sales) لتصفيتها على مستوى Convex.
-    if (args.searchTerm) {
-      salesQuery = salesQuery.filter((q) => q.eq(q.field("invoiceNumber"), args.searchTerm));
-    }
+    let sales: Doc<"sales">[];
 
-    const sales = await salesQuery.order("desc").take(args.limit ?? 100);
+    // تصفية المبيعات حسب البحث
+    if (args.searchTerm) {
+      sales = await ctx.db
+        .query("sales")
+        .withSearchIndex("search_sales", (q) =>
+          q.search("customerName", args.searchTerm!).eq("isArchived", args.isArchived ?? false)
+        ).take(args.limit ?? 100);
+
+      // تطبيق فلترة الصلاحيات يدوياً بعد البحث (لأن Search Index لا يدعم الفلترة المتقدمة)
+      if (user.role === "sales_manager") {
+        sales = sales.filter((s) => s.sellerId === user._id);
+      } else if (user.role === "viewer") {
+        sales = sales.filter((s) => s.userId === user._id);
+      }
+    } else {
+      sales = await salesQuery.order("desc").take(args.limit ?? 100);
+    }
 
     return await Promise.all(
       sales.map(async (sale) => {
@@ -199,7 +248,7 @@ export const getRecentSales = query({
         return {
           ...sale,
           carName: car ? `${car.make} ${car.model}` : "سيارة محذوفة",
-          customerName: customer?.fullName || "زبون غير معروف",
+          customerName: customer?.fullName || "⚠️ زبون غير معرف (تم حذفه)",
           vin: sale.vin || car?.vin || "---",
           mileageAtSale: sale.mileageAtSale || car?.mileage || 0,
           subtotal: sale.subtotal || (sale.amountPaid * 0.81), // افتراضي 19%
@@ -208,7 +257,6 @@ export const getRecentSales = query({
           phone: customer?.phone,
           address: customer?.address,
           email: customer?.email,
-          identityNum: customer?.identityNum,
           sellerName: seller?.fullName || "موظف سابق",
         };
       })

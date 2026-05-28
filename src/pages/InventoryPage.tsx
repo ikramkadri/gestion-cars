@@ -11,13 +11,18 @@ import {
   CheckCircle2,
   Package,
   List as ListIcon,
-  Trash2,
-  Edit3
+  Trash2, 
+  Edit3,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Id } from "../../convex/_generated/dataModel";
 import { CarType } from '../features/cars/types/car.types';
 import StatsCard from '../components/StatsCard'; // استيراد مكون بطاقة الإحصائيات الموحد
+import SaleFormModal from '../components/SaleFormModal';
+import { 
+  
+ } from '../types/app';
 
 const InventoryPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,9 +35,12 @@ const InventoryPage = () => {
   // جلب البيانات من الباك اند (Convex)
   const cars = useQuery(api.cars.getCars, { includeArchived: false, condition: carConditionFilter });
   const stats = useQuery(api.statistics.getDashboardStats, { token });
+  const updateCar = useMutation(api.cars.updateCar);
   const removeCar = useMutation(api.cars.deleteCar);
 
-  // تصفية البيانات بناءً على البحث
+  const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
+  const [selectedCarIdForSale, setSelectedCarIdForSale] = useState<Id<"cars"> | null>(null);
+
   const filteredCars: CarType[] = (cars as CarType[] || [])?.filter((car: CarType) => 
     car.make.toLowerCase().includes(searchQuery.toLowerCase()) || 
     car.model.toLowerCase().includes(searchQuery.toLowerCase())
@@ -46,10 +54,32 @@ const InventoryPage = () => {
         await removeCar({ carId: id, token: token }); // Ensure token is passed
         toast.success("تم حذف السيارة بنجاح", { id: toastId });
       } catch (error: unknown) {
-        console.error("خطأ أثناء الحذف:", error); // Explicitly type error as unknown
+        console.error("Delete error:", error);
         toast.error("فشل حذف السيارة، يرجى المحاولة لاحقاً", { id: toastId });
       }
     }
+  };
+
+  const handleResetStatus = async (id: Id<"cars">, name: string) => {
+    if (window.confirm(`هل تريد إعادة السيارة "${name}" للحالة "متاحة للبيع"؟`)) {
+      const toastId = toast.loading("جاري تحديث الحالة...");
+      try {
+        const token = localStorage.getItem("convex_token") || "";
+        await updateCar({ 
+          token, 
+          carId: id, 
+          updates: { status: "Available", isArchived: false } 
+        });
+        toast.success("السيارة عادت للسوق بنجاح ✅", { id: toastId });
+      } catch {
+        toast.error("فشل التحديث", { id: toastId });
+      }
+    }
+  };
+
+  const handleOpenSaleModal = (carId: Id<"cars">) => {
+    setSelectedCarIdForSale(carId);
+    setIsSaleModalOpen(true);
   };
 
   return (
@@ -137,9 +167,9 @@ const InventoryPage = () => {
           icon={DollarSign} 
           bg="bg-blue-600" 
           color="bg-blue-600"
-          label="قيمة المخزون" 
-          val={stats ? (stats.financials.stockValue / 1000).toFixed(0) : "..."} 
-          unit="K"
+          label="قيمة المخزون الكلية" 
+          val={stats ? (stats.financials.stockValue / 1000000).toFixed(1) : "..."} 
+          unit="M د.ج"
         />
         <StatsCard 
           icon={Clock} 
@@ -207,19 +237,28 @@ const InventoryPage = () => {
                       car.status === "Available" 
                       ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
                       : car.status === "Reserved"
-                      ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                      ? 'bg-amber-100 text-amber-700 border border-amber-200'
                       : 'bg-rose-50 text-rose-600 border border-rose-100'
                     }`}>
-                      {car.status === "Available" ? "متاح" : (car.status as string) === "Reserved" ? "محجوز" : "مباع"}
+                      {car.status === "Available" ? "متاح للبيع" : car.status === "Reserved" ? "محجوزة حالياً" : "تم البيع"}
                     </span>
                   </td>
                   {user?.role !== "viewer" && (
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-2 justify-end">
-                        {(user?.role === "admin" || user?.role === "sales_manager") && 
-                         (car.status === "Available" || (car.status as string) === "Reserved") && (
+                        {user?.role === "admin" && car.status !== "Available" && (
                           <button 
-                            onClick={() => navigate(`/admin/sales/create?carId=${car._id}`)}
+                            onClick={() => handleResetStatus(car._id, `${car.make} ${car.model}`)}
+                            className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-300 transition-all"
+                            title="إعادة السيارة متاحة للبيع"
+                          >
+                            <RefreshCw size={16} />
+                          </button>
+                        )}
+                        {(user?.role === "admin" || user?.role === "sales_manager") && 
+                         (car.status === "Available" || car.status === "Reserved") && (
+                          <button 
+                            onClick={() => handleOpenSaleModal(car._id)}
                             className="p-2 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg text-slate-300 transition-all"
                             title="إتمام عملية البيع"
                           >
@@ -258,6 +297,16 @@ const InventoryPage = () => {
           </table>
         </div>
       </div>
+
+      <SaleFormModal 
+        isOpen={isSaleModalOpen} 
+        key={selectedCarIdForSale || 'new-sale'} 
+        onClose={() => {
+          setIsSaleModalOpen(false);
+          setSelectedCarIdForSale(null);
+        }} 
+        preSelectedCarId={selectedCarIdForSale}
+      />
     </div>
   );
 };

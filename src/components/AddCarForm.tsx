@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Car, MapPin, CheckCircle2, AlertTriangle, X,
   ChevronLeft, ChevronRight,
@@ -35,6 +35,7 @@ const PRESET_COLORS = [
 ];
 
 const CONDITIONS = [
+  { id: 'New', label: 'جديد (00)', color: 'bg-blue-600', icon: '🆕' },
   { id: 'Excellent', label: 'ممتازة', color: 'bg-green-500', icon: '✨' },
   { id: 'Good', label: 'جيدة جداً', color: 'bg-blue-500', icon: '👍' },
   { id: 'Fair', label: 'جيدة', color: 'bg-amber-500', icon: '👌' },
@@ -172,7 +173,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     location: initialData?.location || '',
     vin: initialData?.vin || '',
     color: initialData?.color || undefined, // Default to undefined if no color
-    condition: initialData?.condition || 'Excellent' as CarCondition, // تحديد النوع الافتراضي
+    condition: initialData?.condition || 'New' as CarCondition, // تغيير الافتراضي إلى جديد
     fuel: initialData?.fuel || 'Gasoline',
     transmission: initialData?.transmission || 'Automatic',
     drivetrain: initialData?.drivetrain || 'FWD',

@@ -1,7 +1,31 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth";
-import { Doc, Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel"; // تأكد من استيراد Doc
+
+/**
+ * دالة مساعدة لتوليد نص البحث المدمج
+ * تدعم الآن البحث بالولايات (الرقم، الاسم العربي، والاسم اللاتيني للولايات الـ 10 الأولى)
+ */
+function generateSearchName(make: string, model: string, year: number, location: string) {
+  const wilayaCode = location.split(' - ')[0];
+  const latinNames: Record<string, string> = {
+    '01': 'Adrar أدرار',
+    '02': 'Chlef الشلف',
+    '03': 'Laghouat الأغواط',
+    '04': 'Oum El Bouaghi أم البواقي',
+    '05': 'Batna باتنة',
+    '06': 'Bejaia بجاية',
+    '07': 'Biskra بسكرة',
+    '08': 'Bechar بشار',
+    '09': 'Blida البليدة',
+    '10': 'Bouira البويرة',
+    '16': 'Algiers Alger الجزائر',
+    '31': 'Oran وهران'
+  };
+  const wilayaInfo = latinNames[wilayaCode] || location;
+  return `${make} ${model} ${year} ${wilayaInfo}`.toLowerCase();
+}
 
 /** // CarInsertData is already defined
  * تعريف نوع بيانات السيارة لضمان مطابقة الـ Schema تماماً وتجنب أخطاء TypeScript
@@ -72,7 +96,7 @@ export const addCar = mutation({
 
     const now = Date.now();
     const slug = `${args.make}-${args.model}-${now}`.toLowerCase().replace(/ /g, "-");
-    const searchName = `${args.make} ${args.model} ${args.year}`.toLowerCase();
+    const searchName = generateSearchName(args.make, args.model, args.year, args.location);
 
     const carData: CarInsertData = {
       make: args.make,
@@ -159,8 +183,21 @@ export const updateCar = mutation({
     const existingCar = await ctx.db.get(args.carId);
     if (!existingCar) throw new Error("السيارة غير موجودة.");
 
+    // تحديث نص البحث إذا تغيرت أي من الحقول الأساسية أو الموقع
+    let searchName = existingCar.searchName;
+    if (args.updates.make !== undefined || args.updates.model !== undefined || 
+        args.updates.year !== undefined || args.updates.location !== undefined) {
+      searchName = generateSearchName(
+        args.updates.make ?? existingCar.make,
+        args.updates.model ?? existingCar.model,
+        args.updates.year ?? existingCar.year,
+        args.updates.location ?? existingCar.location
+      );
+    }
+
     await ctx.db.patch(args.carId, {
       ...args.updates,
+      searchName,
       updatedAt: Date.now(),
     });
 
@@ -186,7 +223,8 @@ export const deleteCar = mutation({
 
     const car = await ctx.db.get(args.carId);
     if (car) {
-      await ctx.db.delete(args.carId);
+      // منع الحذف النهائي لضمان بقاء السجلات: نقوم بالأرشفة فقط
+      await ctx.db.patch(args.carId, { isArchived: true, updatedAt: Date.now() });
     }
   },
 });
@@ -197,9 +235,8 @@ export const deleteCar = mutation({
 export const deleteCarById = mutation({
   args: { carId: v.id("cars") },
   handler: async (ctx: MutationCtx, args) => {
-    // ملاحظة: تم إزالة التحقق من التوكن هنا للسماح لك بالتنظيف السريع في بيئة التطوير
-    await ctx.db.delete(args.carId);
-    return "تم حذف السيارة بنجاح.";
+    await ctx.db.patch(args.carId, { isArchived: true, updatedAt: Date.now() });
+    return "تم نقل السيارة إلى الأرشيف بنجاح.";
   },
 });
 
@@ -229,11 +266,21 @@ export const getCars = query({
     status: v.optional(v.union(v.literal("Available"), v.literal("Sold"), v.literal("Reserved"))),
     condition: v.optional(v.union(v.literal("New"), v.literal("Used"), v.literal("All"))), // إضافة فلتر جديد
   },
-  handler: async (ctx: QueryCtx, args) => {
-    let carQuery = ctx.db
-      .query("cars")
-      .withIndex("by_archived", (q) => q.eq("isArchived", args.includeArchived ?? false));
+  handler: async (ctx: QueryCtx, args): Promise<Array<Doc<"cars"> & { mainImageUrl?: string | null; imagesUrls: (string | null)[] }>> => {
+    // إذا كان الطلب من واجهة الزوار (includeArchived false)، سنعرض غير المؤرشف + المباع المؤرشف
+    let carQuery = ctx.db.query("cars");
+    
+    if (!args.includeArchived) {
+      // أظهر السيارات النشطة (غير مؤرشفة) + السيارات المباعة حتى لو تم أرشفتها للعرض التاريخي
+      carQuery = carQuery.filter(q => 
+        q.or(
+          q.eq(q.field("isArchived"), false),
+          q.and(q.eq(q.field("status"), "Sold"), q.eq(q.field("isArchived"), true))
+        )
+      );
+    }
 
+    // إذا تم طلب حالة معينة، نطبقها، لكن للزائر نفضل عرض الكل (متاح + مباع) إذا لم يحدد
     if (args.status) {
       carQuery = carQuery.filter(q => q.eq(q.field("status"), args.status));
     }
@@ -247,7 +294,8 @@ export const getCars = query({
     return await Promise.all(
       finalCars.map(async (car) => ({
         ...car,
-        mainImageUrl: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : undefined,
+        mainImageUrl: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : null,
+        imagesUrls: car.images ? await Promise.all(car.images.map(async (id) => await ctx.storage.getUrl(id))) : [],
       }))
     );
   },
@@ -273,23 +321,34 @@ export const searchCars = query({
       results = await ctx.db
         .query("cars")
         .withSearchIndex("search_cars", (q) => {
-          let search = q.search("searchName", args.searchTerm)
-            .eq("isArchived", false);
+          let search = q.search("searchName", args.searchTerm);
           
           if (args.make) search = search.eq("make", args.make);
-          search = search.eq("status", args.status ?? "Available");
+          // تعديل: لا نقوم بفرض حالة "Available" افتراضياً، بل نعرض الكل إلا إذا حدد المستخدم الفلتر
+          if (args.status) search = search.eq("status", args.status);
           if (args.location) search = search.eq("location", args.location);
           return search;
         })
         .collect();
+
+      // تطبيق الفلترة الذكية بعد جلب النتائج: أظهر غير مؤرشف + المباع المؤرشف (لعرض تاريخ المبيعات)
+      results = results.filter(car => 
+        !car.isArchived || (car.status === "Sold" && car.isArchived)
+      );
     } else {
-      // في حال عدم وجود نص بحث، نستخدم الفهارس العادية للفلترة
-      const q = ctx.db.query("cars")
-        .withIndex("by_status_archived", (dbQ) => 
-          dbQ.eq("status", args.status ?? "Available").eq("isArchived", false)
-        );
-      
-      results = await q.order("desc").collect();
+      // إصلاح العطل: جلب السيارات مع دعم ظهور المباع المؤرشف في القائمة الرئيسية
+      results = await ctx.db.query("cars")
+        .filter(q => 
+          q.or(
+            q.eq(q.field("isArchived"), false),
+            q.and(q.eq(q.field("status"), "Sold"), q.eq(q.field("isArchived"), true))
+          )
+        )
+        .order("desc")
+        .collect();
+
+      // تطبيق فلتر الحالة يدوياً فقط إذا تم إرساله من الواجهة
+      if (args.status) results = results.filter(c => c.status === args.status);
 
       // تصفية إضافية للموقع والماركة إذا تم اختيارهما
       if (args.location) results = results.filter(c => c.location === args.location);
@@ -305,7 +364,8 @@ export const searchCars = query({
     return await Promise.all(
       results.map(async (car) => ({
         ...car,
-        mainImageUrl: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : undefined,
+        mainImageUrl: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : null,
+        imagesUrls: car.images ? await Promise.all(car.images.map(async (id) => await ctx.storage.getUrl(id))) : [],
       }))
     );
   },
@@ -322,8 +382,8 @@ export const getCarById = query({
     
     return {
       ...car,
-      mainImageUrl: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : undefined,
-      imageUrls: car.images ? await Promise.all(car.images.map(async (id) => await ctx.storage.getUrl(id))) : [],
+      mainImageUrl: car.mainImage ? await ctx.storage.getUrl(car.mainImage) : null,
+      imagesUrls: car.images ? await Promise.all(car.images.map(async (id) => await ctx.storage.getUrl(id))) : [],
     };
   },
 });
@@ -333,32 +393,4 @@ export const getCarById = query({
  */
 export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
-});
-
-/**
- * حل نهائي: ترقية حساب admin_motorix@gmail.com إلى مدير نظام بكامل الصلاحيات
- * يضمن هذا التحديث ظهور السايدبار الطويل وفتح كل الأقسام
- */
-export const fixAdminRole = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const targetEmail = "admin_motorix@gmail.com";
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", targetEmail))
-      .unique();
-
-    if (!user) {
-      throw new Error("لم يتم العثور على حساب بهذا البريد. يرجى تسجيل الدخول أولاً في الموقع.");
-    }
-
-    // ترقية الرتبة وتفعيل الحساب بشكل كامل
-    await ctx.db.patch(user._id, { 
-      role: "admin", 
-      status: "active", 
-      verified: true 
-    });
-
-    return `تمت الترقية بنجاح لـ ${user.fullName}. السايدبار الطويل سيظهر الآن.`;
-  },
 });

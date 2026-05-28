@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { 
-  Calendar, Clock, Car, User, XCircle, Ban, DollarSign, Loader2, Mail, CheckCircle2
+  Calendar, Clock, Car, User, XCircle, Ban, DollarSign, Loader2, Mail, CheckCircle2,
+  ListFilter, CheckCircle, Timer
 } from 'lucide-react';
-import { toast } from 'react-hot-toast'; // Removed unused imports
-import SaleFormModal from '../components/SaleFormModal'; // Corrected import path
-import { BookingWithDetails } from '../types/app'; // Import from types/app (already correct)
+import { toast } from 'react-hot-toast';
+import SaleFormModal from '../components/SaleFormModal';
+import { BookingWithDetails } from '../types/app';
 
 const BookingsPage = () => {
   const token = localStorage.getItem("convex_token") || "";
+  const [activeTab, setActiveTab] = useState<'pending' | 'confirmed'>('pending');
   
   const bookings = useQuery(api.bookings.getPendingBookings, { token }) as BookingWithDetails[] | undefined;
   const cancelBooking = useMutation(api.bookings.cancelBooking);
@@ -18,7 +20,7 @@ const BookingsPage = () => {
   const rejectBooking = useMutation(api.bookings.rejectBooking);
 
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
-  const [selectedBooking, setSelectedBooking] = useState<BookingWithDetails | null>(null); // Already typed correctly
+  const [selectedBooking, setSelectedBooking] = useState<BookingWithDetails | null>(null);
 
   const handleCancel = async (id: Id<"bookings">) => {
     if (!window.confirm("هل أنت متأكد من إلغاء هذا الحجز؟")) return;
@@ -40,10 +42,9 @@ const BookingsPage = () => {
     }
   };
 
-
-  const handleReject = async (id: Id<"bookings">) => { // Already typed correctly
+  const handleReject = async (id: Id<"bookings">) => {
     const reason = window.prompt("يرجى كتابة سبب رفض الحجز للزبون:");
-    if (reason === null) return; // تم إلغاء العملية
+    if (reason === null) return;
     if (reason.trim() === "") return toast.error("يجب كتابة سبب الرفض.");
 
     try {
@@ -54,10 +55,14 @@ const BookingsPage = () => {
     }
   };
 
-  const openSaleModal = (booking: BookingWithDetails) => { // Already typed correctly
+  const openSaleModal = (booking: BookingWithDetails) => {
     setSelectedBooking(booking);
     setIsSaleModalOpen(true);
   };
+
+  const filteredBookings = useMemo(() => {
+    return bookings?.filter(b => b.status === activeTab) || [];
+  }, [bookings, activeTab]);
 
   if (bookings === undefined) {
     return (
@@ -74,9 +79,30 @@ const BookingsPage = () => {
         <p className="text-slate-500 font-bold italic">طلبات الحجز المعلقة من قبل الزبائن</p>
       </div>
 
+      {/* نظام التبويبات الجديد للتقسيم */}
+      <div className="flex gap-4 mb-8 bg-white w-fit p-1.5 rounded-2xl border border-slate-100 shadow-sm">
+        <button 
+          onClick={() => setActiveTab('pending')}
+          className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'pending' ? 'bg-amber-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <Timer size={16} /> قيد الانتظار ({bookings?.filter(b => b.status === 'pending').length || 0})
+        </button>
+        <button 
+          onClick={() => setActiveTab('confirmed')}
+          className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'confirmed' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+        >
+          <CheckCircle size={16} /> مؤكدة / للمعاينة ({bookings?.filter(b => b.status === 'confirmed').length || 0})
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 gap-6">
-        {bookings.length > 0 ? bookings.map((booking: BookingWithDetails) => ( // Already typed correctly
-          <div key={booking._id} className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 hover:shadow-md transition-all">
+        {filteredBookings.length > 0 ? filteredBookings.map((booking: BookingWithDetails) => (
+          <div 
+            key={booking._id} 
+            className={`bg-white rounded-[2rem] p-6 shadow-sm border flex flex-col md:flex-row items-center justify-between gap-6 hover:shadow-md transition-all ${
+              booking.status === 'confirmed' ? 'border-indigo-100 border-r-8 border-r-indigo-500' : 'border-slate-100'
+            }`}
+          >
             <div className="flex items-center gap-4 w-full md:w-auto">
               <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
                 <Car size={32} />
@@ -103,7 +129,11 @@ const BookingsPage = () => {
                   <p className="font-black text-slate-800 text-sm">
                     {booking.clientDetails?.fullName || booking.guestName || "زبون زائر"}
                   </p>
-                  {booking.userId && <CheckCircle2 size={14} className="text-blue-500" title="عضو مسجل" />}
+                  {booking.userId && (
+                    <span title="عضو مسجل">
+                      <CheckCircle2 size={14} className="text-blue-500" />
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
                   <Mail size={12} className="text-slate-300" />
@@ -125,17 +155,19 @@ const BookingsPage = () => {
               </div>
 
               <div className="flex gap-2">
-                <button 
-                  onClick={() => handleApprove(booking._id)}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black text-xs hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100"
-                >
-                  <CheckCircle2 size={16} /> قبول الحجز
-                </button>
+                {activeTab === 'pending' && (
+                  <button 
+                    onClick={() => handleApprove(booking._id)}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black text-xs hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg shadow-blue-100"
+                  >
+                    <CheckCircle2 size={16} /> قبول ومعاينة
+                  </button>
+                )}
                 <button 
                   onClick={() => openSaleModal(booking)}
                   className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-black text-xs hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-lg shadow-emerald-200"
                 >
-                  <DollarSign size={16} /> إتمام البيع
+                  <DollarSign size={16} /> إتمام البيع النهائي
                 </button>
                 <button 
                   onClick={() => handleReject(booking._id)}
@@ -154,16 +186,17 @@ const BookingsPage = () => {
           </div>
         )) : (
           <div className="bg-white rounded-[2rem] p-20 text-center border-2 border-dashed border-slate-200">
-            <Calendar size={48} className="mx-auto text-slate-200 mb-4" />
-            <p className="text-slate-400 font-bold italic">لا توجد حجوزات معلقة حالياً.</p>
+            <ListFilter size={48} className="mx-auto text-slate-200 mb-4" />
+            <p className="text-slate-400 font-bold italic">لا توجد حجوزات في هذا القسم حالياً.</p>
           </div>
         )}
       </div>
 
       <SaleFormModal 
         isOpen={isSaleModalOpen} 
+        key={selectedBooking?._id || 'new-sale'} // Add key to force remount and reset state
         onClose={() => setIsSaleModalOpen(false)} 
-        initialData={selectedBooking}
+        initialData={selectedBooking || undefined}
       />
     </div>
   );

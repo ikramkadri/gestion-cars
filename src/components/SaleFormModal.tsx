@@ -1,80 +1,110 @@
-import { useState, useEffect } from 'react'; // Added useEffect
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Id, Doc } from '../../convex/_generated/dataModel';
-import { X, User, Phone, DollarSign, CreditCard, Car, Loader2, MapPin, Hash } from 'lucide-react';
+import { Id } from '../../convex/_generated/dataModel';
+import { X, User, Phone, DollarSign, CreditCard, Car, Loader2, MapPin, Hash, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
+import { BookingWithDetails } from '../types/app'; // استخدام النوع من الملف الموحد
 
 interface SaleFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialData?: BookingWithDetails | null; // Added initialData prop
+  initialData?: BookingWithDetails | null;
+  preSelectedCarId?: Id<"cars"> | null;
 }
 
-interface BookingWithDetails extends Doc<"bookings"> { // Moved from BookingsPage.tsx
-  carId: Id<"cars">; // Explicitly add carId as it's used directly
-  carDetails: Doc<"cars">; // Details of the car that was booked
-  clientDetails: Doc<"users"> | null; // يمكن أن يكون null إذا كان ضيفاً
-  // الحقول الجديدة التي تم إضافتها في الشيما
-  guestName?: string;
-  guestPhone?: string;
-  customerPhone: string;
-  customerLocation: string;
-  message?: string;
-  bookingReference: string;
-  verificationMethod?: "phone_call" | "whatsapp" | "manual";
-  bookingSource?: "website" | "whatsapp" | "phone_call" | "facebook";
-  status: "pending" | "confirmed" | "cancelled" | "rejected";
-  rejectionReason?: string;
+// تعريف نوع الحالة الخاصة بالنموذج
+interface SaleFormData {
+  carId: string;
+  customerName: string;
+  phone: string;
+  address: string;
+  identityNum: string;
+  amountPaid: number;
+  vin: string;
+  paymentMethod: "Cash" | "Bank Transfer" | "Check" | "Card";
 }
 
-const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => {
+const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId }: SaleFormModalProps) => {
   const token = localStorage.getItem("convex_token") || "";
   const { width, height } = useWindowSize();
   
   // جلب السيارات (المتاحة والمحجوزة) القابلة للبيع
   const allCars = useQuery(api.cars.getCars, { includeArchived: false });
   const createSale = useMutation(api.sales.createSale);
+  
+  // محاولة جلب بيانات الحجز إذا كانت السيارة مختارة ومحجوزة
+  const activeBooking = useQuery(api.bookings.getActiveBookingForCar, preSelectedCarId ? { carId: preSelectedCarId } : "skip");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
 
-  const [formData, setFormData] = useState({
-    carId: '',
-    customerName: '',
-    phone: '',
-    address: '',
-    identityNum: '',
-    amountPaid: 0,
-    vin: '',
-    paymentMethod: 'Cash' as "Cash" | "Bank Transfer" | "Check" | "Card",
+  const [formData, setFormData] = useState<SaleFormData>(() => {
+    if (initialData) {
+      return {
+        carId: initialData.carId,
+        customerName: initialData.clientDetails?.fullName || initialData.guestName || '',
+        phone: initialData.customerPhone || initialData.clientDetails?.phone || '',
+        address: initialData.customerLocation || initialData.clientDetails?.address || '',
+        identityNum: '', // Assuming this is not in initialData
+        amountPaid: initialData.carDetails?.price || 0,
+        vin: initialData.carDetails?.vin || '',
+        paymentMethod: 'Cash',
+      };
+    } else if (preSelectedCarId) {
+      // For preSelectedCarId, we can initialize with the carId.
+      // Other details (customerName, phone, address, amountPaid, vin) will be filled by a subsequent useEffect
+      // once `allCars` and `activeBooking` are loaded.
+      return {
+        carId: preSelectedCarId,
+        customerName: '', phone: '', address: '', identityNum: '', amountPaid: 0, vin: '', paymentMethod: 'Cash',
+      };
+    } else {
+      // Manual entry, start with empty form
+      return {
+        carId: '', customerName: '', phone: '', address: '', identityNum: '', amountPaid: 0, vin: '', paymentMethod: 'Cash',
+      };
+    }
   });
 
   // تصفية السيارات لعرض المتاحة والمحجوزة فقط، أو السيارة المحددة في الحجز
   const displayCars = allCars?.filter(car => 
-    car.status === "Available" || 
-    car.status === "Reserved" || 
-    (initialData && car._id === initialData.carId)
+    (car.status === "Available" || car.status === "Reserved") && 
+    (!initialData || car._id === initialData.carId || car.status === "Available")
   );
 
   useEffect(() => {
-    if (initialData) {
-      setFormData({
-        carId: initialData.carId as string, // Cast to string for input value
-        customerName: initialData.clientDetails?.fullName || initialData.guestName || '', // الأولوية لاسم المستخدم المسجل، ثم اسم الضيف
-        phone: initialData.customerPhone || initialData.clientDetails?.phone || initialData.guestPhone || '', // الأولوية لهاتف الحجز، ثم هاتف المستخدم، ثم هاتف الضيف
-        amountPaid: initialData.carDetails?.price || 0,
-        address: initialData.customerLocation || initialData.clientDetails?.address || '', // الأولوية لولاية الحجز، ثم عنوان المستخدم
-        identityNum: '',
-        vin: initialData.carDetails?.vin || '',
-        paymentMethod: 'Cash',
-      });
+    if (!isOpen) {
+      return;
     }
-  }, [initialData]);
 
-  // دالة ذكية لتحديث البيانات عند تغيير السيارة المختارة
+    if (preSelectedCarId && allCars !== undefined && activeBooking !== undefined) {
+      const car = allCars.find(c => c._id === preSelectedCarId);
+      
+      if (car && (formData.carId !== preSelectedCarId || formData.customerName === '')) {
+        setFormData(prev => ({
+          ...prev,
+          carId: preSelectedCarId,
+          customerName: activeBooking?.clientDetails?.fullName || activeBooking?.guestName || '',
+          phone: activeBooking?.customerPhone || activeBooking?.clientDetails?.phone || '',
+          address: activeBooking?.customerLocation || activeBooking?.clientDetails?.address || '',
+          amountPaid: car?.price || prev.amountPaid,
+          vin: car?.vin || '',
+        }));
+      }
+    }
+  }, [
+    isOpen, 
+    initialData, 
+    preSelectedCarId, 
+    allCars, 
+    activeBooking, 
+    formData.carId, 
+    formData.customerName
+  ]); // Dependencies updated to include used form fields
+
   const handleCarSelection = (carId: Id<"cars">) => {
     const car = allCars?.find(c => c._id === carId);
     setFormData(prev => ({
@@ -89,28 +119,40 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.carId) return toast.error("يرجى اختيار سيارة");
+    
+    // 1. منع إرسال البيانات إذا كانت ناقصة (التحقق الصارم)
+    if (!formData.carId) return toast.error("خطأ: يرجى اختيار سيارة أولاً.");
+    if (!formData.customerName.trim()) return toast.error("يرجى إدخال اسم الزبون الكامل.");
+    if (!formData.phone.trim()) return toast.error("رقم هاتف الزبون إلزامي.");
+    if (!formData.identityNum.trim()) return toast.error("رقم الهوية (NIN) مطلوب قانونياً.");
+    if (!formData.address.trim()) return toast.error("عنوان السكن مطلوب لإصدار الفاتورة.");
+
+    // 2. التحقق من دفع كامل المبلغ
+    const car = allCars?.find(c => c._id === formData.carId);
+    if (car && formData.amountPaid < car.price) {
+      return toast.error("لا يمكن إتمام البيع: المبلغ المدفوع أقل من سعر السيارة.");
+    }
 
     setIsSubmitting(true);
     try {
-      await createSale({
+      const saleId = await createSale({
         ...formData,
         carId: formData.carId as Id<"cars">, // Cast to Id<"cars">
-        address: formData.address || undefined,
-        identityNum: formData.identityNum || undefined,
         bookingId: initialData?._id, // إرسال المعرف لفك الالتباس في السيرفر
         token,
       });
 
-      // تشغيل الاحتفال 🎉
+      // ميزة الطباعة التلقائية: فتح الفاتورة في نافذة جديدة مهيأة للطباعة فوراً
+      if (saleId) {
+        const printUrl = `/admin/invoice/${saleId}?print=true`;
+        window.open(printUrl, '_blank');
+      }
+
       setShowConfetti(true);
       toast.success("مبارك! تمت عملية البيع وإصدار الفاتورة بنجاح 🎉", { duration: 5000 });
 
-      // ننتظر 5 ثوانٍ ليستمتع الأدمن باللحظة قبل إغلاق النافذة وتصفير الحالة
-      setTimeout(() => {
-        onClose();
-        setShowConfetti(false);
-      }, 5000);
+      // إغلاق النافذة فوراً للسماح للموظف بمتابعة العمل، مع ترك الاحتفال يظهر
+      setTimeout(() => { onClose(); setShowConfetti(false); }, 4000);
 
     } catch (error: unknown) {
       setIsSubmitting(false);
@@ -120,6 +162,10 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
   };
 
   const selectedCar = allCars?.find((c) => c._id === formData.carId);
+  const remainingAmount = selectedCar ? Math.max(0, selectedCar.price - formData.amountPaid) : 0;
+  const paymentPercentage = selectedCar ? Math.min(100, (formData.amountPaid / selectedCar.price) * 100) : 0;
+
+  const getAutoFilledClass = (val: string | number | null | undefined) => val ? "bg-blue-50/50 border-blue-200 text-blue-900" : "bg-slate-50 border-slate-100";
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
@@ -135,9 +181,9 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
         />
       )}
 
-      <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-white w-full max-w-2xl max-h-[95vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200" dir="rtl">
         {/* Header */}
-        <div className="bg-indigo-600 p-6 text-white flex justify-between items-center">
+        <div className="bg-gradient-to-r from-blue-700 to-indigo-900 p-6 text-white flex justify-between items-center border-b-4 border-[#D4AF37] shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
               <DollarSign size={20} />
@@ -149,19 +195,22 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6" dir="rtl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-2">
             
             {/* اختيار السيارة */}
-            <div className="col-span-2 space-y-2">
+            <div className="col-span-2 space-y-2 bg-blue-50/50 p-4 rounded-3xl border border-blue-100">
               <label className="text-xs font-black text-slate-400 uppercase mr-1 flex items-center gap-1">
-                <Car size={14} /> اختر المركبة المباعة
+                <Car size={14} /> {(initialData || preSelectedCarId) ? "المركبة المحددة (مقيدة)" : "اختر المركبة المباعة"}
               </label>
               <select 
                 required
+                disabled={!!initialData || !!preSelectedCarId}
                 value={formData.carId}
                 onChange={(e) => handleCarSelection(e.target.value as Id<"cars">)}
-                className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all appearance-none"
+                className={`w-full p-4 rounded-2xl font-black text-sm outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all appearance-none text-indigo-900 shadow-sm ${
+                  (initialData || preSelectedCarId) ? 'bg-slate-100 border-slate-200 cursor-not-allowed opacity-80' : 'bg-white border-slate-200'
+                }`}
               >
                 <option value="">-- اختر من المخزون المتاح --</option>
                 {displayCars?.map((car) => (
@@ -185,7 +234,7 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
               <input 
                 type="text"
                 placeholder="الرقم التسلسلي للمركبة..."
-                className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-mono text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                className={`w-full p-4 rounded-2xl font-mono text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${getAutoFilledClass(formData.vin)}`}
                 value={formData.vin}
                 onChange={(e) => setFormData({...formData, vin: e.target.value})}
               />
@@ -200,7 +249,7 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
                 type="text"
                 required
                 placeholder="ياسين..."
-                className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                className={`w-full p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${getAutoFilledClass(formData.customerName)}`}
                 value={formData.customerName}
                 onChange={(e) => setFormData({...formData, customerName: e.target.value})}
               />
@@ -214,7 +263,7 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
                 type="tel"
                 required
                 placeholder="06..."
-                className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                className={`w-full p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${getAutoFilledClass(formData.phone)}`}
                 value={formData.phone}
                 onChange={(e) => setFormData({...formData, phone: e.target.value})}
               />
@@ -227,6 +276,7 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
               </label>
               <input 
                 type="text"
+                required
                 placeholder="123456789..."
                 className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                 value={formData.identityNum}
@@ -241,25 +291,53 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
               </label>
               <input 
                 type="text"
+                required
                 placeholder="الولاية، الدائرة، الحي..."
-                className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+                className={`w-full p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${getAutoFilledClass(formData.address)}`}
                 value={formData.address}
                 onChange={(e) => setFormData({...formData, address: e.target.value})}
               />
             </div>
 
-            {/* البيانات المالية */}
-            <div className="space-y-2">
-              <label className="text-xs font-black text-slate-400 uppercase mr-1 flex items-center gap-1">
-                <DollarSign size={14} /> إجمالي قيمة المركبة (مستحق الدفع كاملاً)
-              </label>
-              <input 
-                type="number"
-                required
-                readOnly
-                className="w-full bg-slate-100 border border-slate-200 p-4 rounded-2xl font-black text-sm outline-none cursor-not-allowed text-indigo-600"
-                value={formData.amountPaid || ''}
-              />
+            {/* قسم الخلاص المطور */}
+            <div className="col-span-2 bg-slate-50 p-6 rounded-[2.5rem] border-2 border-dashed border-slate-200 space-y-4">
+              <div className="flex justify-between items-center px-2">
+                <label className="text-[10px] font-black text-blue-900 uppercase tracking-widest flex items-center gap-2">
+                   <DollarSign size={16} className="text-[#D4AF37]" /> تفاصيل الدفعة المالية (الخلاص)
+                </label>
+                {selectedCar && (
+                  <span className="text-[10px] font-bold text-slate-400 italic">سعر المركبة الأصلي: {selectedCar.price.toLocaleString()} دج</span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                <div className="relative">
+                  <input 
+                    type="number"
+                    required
+                    className={`w-full border-2 p-4 rounded-2xl font-black text-2xl outline-none focus:border-blue-500 transition-all text-blue-700 shadow-sm ${initialData ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100'}`}
+                    value={formData.amountPaid || ''}
+                    onChange={(e) => setFormData({...formData, amountPaid: Number(e.target.value)})}
+                    placeholder="أدخل المبلغ المدفوع..."
+                  />
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 font-bold">دج</span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[11px] font-black uppercase">
+                    <span className={remainingAmount === 0 ? "text-emerald-600" : "text-amber-600"}>
+                      {remainingAmount === 0 ? "تم السداد بالكامل ✅" : `المتبقي: ${remainingAmount.toLocaleString()} دج`}
+                    </span>
+                    <span className="text-slate-400">{Math.round(paymentPercentage)}%</span>
+                  </div>
+                  <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden shadow-inner border border-white">
+                    <div 
+                      className={`h-full transition-all duration-1000 ${paymentPercentage === 100 ? 'bg-emerald-500' : 'bg-gradient-to-r from-blue-600 to-indigo-600 animate-pulse'}`}
+                      style={{ width: `${paymentPercentage}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -278,15 +356,30 @@ const SaleFormModal = ({ isOpen, onClose, initialData }: SaleFormModalProps) => 
               </select>
             </div>
           </div>
-
-          <button 
-            disabled={isSubmitting}
-            className="w-full bg-indigo-600 text-white py-5 rounded-[2rem] font-black text-lg mt-4 hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 active:scale-[0.98] flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            {isSubmitting ? <Loader2 className="animate-spin" /> : <DollarSign size={20} />}
-            إتمام الصفقة وإصدار الفاتورة
-          </button>
         </form>
+
+        {/* Footer Actions */}
+        <div className="p-8 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
+          <button 
+            type="button"
+            onClick={onClose}
+            className="flex-1 bg-white text-slate-500 py-4 rounded-2xl font-black text-sm hover:bg-slate-100 transition-all border border-slate-200"
+          >
+            إلغاء
+          </button>
+          <button 
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className={`flex-[2] py-4 rounded-2xl font-black text-lg transition-all shadow-xl active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 ${
+              remainingAmount === 0 
+              ? 'bg-gradient-to-r from-green-600 to-emerald-700 text-white shadow-green-100' 
+              : 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-amber-100'
+            }`}
+          >
+            {isSubmitting ? <Loader2 className="animate-spin" /> : <CheckCircle2 size={24} />}
+            {remainingAmount === 0 ? "إتمام البيع النهائي 🎉" : "تسجيل عربون/دفع جزئي ⚠️"}
+          </button>
+        </div>
       </div>
     </div>
   );

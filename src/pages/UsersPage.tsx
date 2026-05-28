@@ -39,7 +39,7 @@ const UsersPage = () => {
   // تغيير رتبة المستخدم فورياً
   const handleRoleChange = async (userId: Id<"users">, newRole: "admin" | "sales_manager" | "viewer") => {
     try {
-      await updateRole({ token, userId, role: newRole as any });
+      await updateRole({ token, userId, role: newRole });
       toast.success("تم تحديث رتبة المستخدم بنجاح");
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء التحديث.");
@@ -146,7 +146,7 @@ const UsersPage = () => {
                   <td className="px-8 py-5">
                     <select 
                       value={user.role}
-                      onChange={(e) => handleRoleChange(user._id, e.target.value as any)}
+                      onChange={(e) => handleRoleChange(user._id, e.target.value as "admin" | "sales_manager" | "viewer")}
                       className={`
                         text-[10px] font-black px-3 py-1.5 rounded-lg border-0 ring-1 ring-inset outline-none cursor-pointer transition-all
                         ${user.role === 'admin' ? 'bg-amber-50 text-amber-700 ring-amber-200' : 

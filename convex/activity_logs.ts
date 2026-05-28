@@ -2,10 +2,9 @@
  * المسار: convex/activity_logs.ts
  * الوظيفة: جلب آخر النشاطات التي حدثت في النظام.
  */
-import { query, internalMutation, MutationCtx, FilterBuilder } from "./_generated/server";
+import { query, internalMutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth"; // استيراد دالة المصادقة الموحدة
-import { Doc } from "./_generated/dataModel";
 
 export const getLatestLogs = query({
   args: { limit: v.optional(v.number()), token: v.optional(v.string()) },
@@ -40,7 +39,7 @@ export const clearOldLogs = internalMutation({
     const ninetyDaysAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
     const oldLogs = await ctx.db
       .query("activity_logs")
-      .withIndex("by_createdAt", (q: FilterBuilder<Doc<"activity_logs">>) => q.lt("createdAt", ninetyDaysAgo))
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", ninetyDaysAgo))
       .collect();
 
     for (const log of oldLogs) await ctx.db.delete(log._id);

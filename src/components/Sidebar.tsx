@@ -1,10 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, Car, Settings, LogOut, 
   Users, BookOpen, FileText, BarChart3, ShieldCheck,
   ShoppingCart,
-  ChevronRight, ChevronLeft, UserCheck, PlusCircle, Archive, Bell, Search, Star,
+  ChevronRight, ChevronLeft, UserCheck, PlusCircle, Archive, Bell, Search, // Removed Star
   ShieldAlert, CheckCircle, XCircle
 } from 'lucide-react';
 import type { Doc } from '../../convex/_generated/dataModel';
@@ -73,7 +73,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onSignOut }) => {
       ...(user?.role === 'admin' ? [
         { id: 'statistics', label: 'التقارير المالية', icon: BarChart3, color: 'text-rose-500' },
         { id: 'users', label: 'إدارة الموظفين', icon: ShieldCheck, color: 'text-indigo-500' },
-        { id: 'reviews-admin', label: 'إدارة التقييمات', icon: Star, color: 'text-amber-500' },
         { id: 'settings', label: 'إعدادات النظام', icon: Settings, color: 'text-slate-400' },
       ] : [{ id: 'settings', label: 'حسابي الشخصي', icon: UserCheck, color: 'text-slate-400' }]),
     ]),

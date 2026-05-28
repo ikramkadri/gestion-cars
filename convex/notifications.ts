@@ -1,5 +1,5 @@
+import { query, mutation, internalMutation, QueryCtx, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { mutation, query, internalMutation, MutationCtx, QueryCtx } from "./_generated/server"; // تم دمج الاستيرادات
 import { getAuthenticatedUser } from "./auth";
 
 /**
@@ -139,7 +139,7 @@ export const clearOldNotifications = internalMutation({
     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
     const oldNotifications = await ctx.db
       .query("notifications")
-      .withIndex("by_createdAt", (q: FilterBuilder<Doc<"notifications">>) => q.lt("createdAt", thirtyDaysAgo))
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", thirtyDaysAgo))
       .collect();
 
     for (const notif of oldNotifications) await ctx.db.delete(notif._id);

@@ -17,7 +17,6 @@ import InvoicesPage from "./pages/InvoicesPage";
 import StatisticsPage from "./pages/StatisticsPage";
 import OrdersPage from "./pages/OrdersPage";
 import NotificationsPage from "./pages/NotificationsPage";
-import ReviewsPage from "./pages/ReviewsPage";
 import ArchivedInventoryPage from "./pages/ArchivedInventoryPage";
 import SettingsPage from "./pages/SettingsPage";
 import Navbar from "./components/Navbar";
@@ -102,7 +101,6 @@ function AuthenticatedApp() {
         <Route path="bookings" element={<BookingsPage />} />
         <Route path="orders" element={<OrdersPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
-        <Route path="reviews-admin" element={<ReviewsPage />} />
         <Route path="invoices" element={<InvoicesPage />} />
         <Route path="statistics" element={<StatisticsPage />} />
         <Route path="settings" element={<SettingsPage />} />

@@ -1,15 +1,17 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Car, DollarSign, TrendingUp, Activity, Package, CheckCircle2 } from 'lucide-react';
+import { Car, DollarSign, TrendingUp, Activity, Package, CheckCircle2, LayoutGrid, Users, BookOpen, Wallet, ShieldCheck, ArrowUpRight } from 'lucide-react';
 import { SaleWithDetails } from '../types/app';
 import DashboardChart from '../components/DashboardChart';
 import { Doc } from '../../convex/_generated/dataModel';
 import StatsCard from '../components/StatsCard';
-import { useLanguage } from './LanguageContext';
+import { useLanguage } from '../lib/LanguageContext';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard = () => {
   const token = localStorage.getItem("convex_token") ?? undefined;
-  const { t, lang } = useLanguage();
+  const navigate = useNavigate();
+  const { t, language, isRtl } = useLanguage();
   // جلب بيانات المستخدم الحالي لمعرفة الرتبة والاسم
   const user = useQuery(api.users.viewer, { token }); // يجب أن يكون token هنا هو token أو undefined
 
@@ -29,7 +31,7 @@ const Dashboard = () => {
                    `Welcome to MOTORIX, ${user?.fullName || ''}`;
 
   return (
-    <div className="min-h-screen bg-[#F8F9FD] p-8 font-sans" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+    <div className="min-h-screen bg-[#F8F9FD] p-8 font-sans" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* الـ Header */}
       <div className="flex justify-between items-center mb-10">
         <div>
@@ -50,17 +52,17 @@ const Dashboard = () => {
         {(user?.role === 'admin' || user?.role === 'sales_manager') && (
           <StatsCard 
             icon={DollarSign} 
-            color="bg-indigo-600" 
+            color="text-white" 
             bg="bg-indigo-600"
             label={t('total_sales')}
             val={stats.financials.totalRevenue.toLocaleString()}
-            unit={lang === 'ar' ? 'د.ج' : 'DZD'}
+            unit={language === 'ar' ? 'د.ج' : 'DZD'}
           />
         )}
         {user?.role === 'admin' && ( // خصوصية الأرباح للأدمن فقط
           <StatsCard 
             icon={TrendingUp} 
-            color="bg-emerald-500"
+            color="text-white"
             bg="bg-emerald-500"
             label="صافي الأرباح" 
             val={stats.financials.totalProfit.toLocaleString()}
@@ -69,7 +71,7 @@ const Dashboard = () => {
         )}
         <StatsCard // الموظف يرى حجم المخزون لتسهيل البيع
           icon={Car} 
-          color="bg-slate-900"
+          color="text-white"
           bg="bg-slate-900"
           label="المخزون المتوفر" 
           val={stats.inventory.available.toString()}
@@ -78,7 +80,7 @@ const Dashboard = () => {
         {user?.role === 'admin' && ( // الموظف لا يرى رأس المال المستثمر في المخزون
           <StatsCard 
             icon={Package} 
-            color="bg-amber-500"
+            color="text-white"
             bg="bg-amber-500"
             label="قيمة المخزون" 
             val={(stats.financials.stockValue / 1000000).toFixed(1)}
@@ -86,6 +88,44 @@ const Dashboard = () => {
           />
         )}
       </div>
+
+      {/* قسم الإجراءات السريعة - حصري للأدمن - "السلايد المعمر" */}
+      {user?.role === 'admin' && (
+        <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
+           <div className="flex items-center justify-between mb-6">
+              <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                <LayoutGrid size={20} className="text-indigo-600" /> مركز القيادة السريع
+              </h3>
+              <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full uppercase tracking-tighter">Admin Access Only</span>
+           </div>
+           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <button onClick={() => navigate('/admin/inventory/add')} className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex flex-col items-center gap-3 group">
+                 <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                    <Car size={24} />
+                 </div>
+                 <span className="font-black text-xs text-slate-600">إضافة مركبة</span>
+              </button>
+              <button onClick={() => navigate('/admin/bookings')} className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all flex flex-col items-center gap-3 group">
+                 <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:bg-amber-600 group-hover:text-white transition-all">
+                    <BookOpen size={24} />
+                 </div>
+                 <span className="font-black text-xs text-slate-600">إدارة الحجوزات</span>
+              </button>
+              <button onClick={() => navigate('/admin/users')} className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all flex flex-col items-center gap-3 group">
+                 <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-all">
+                    <Users size={24} />
+                 </div>
+                 <span className="font-black text-xs text-slate-600">الموظفين</span>
+              </button>
+              <button onClick={() => navigate('/admin/statistics')} className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all flex flex-col items-center gap-3 group">
+                 <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                    <Wallet size={24} />
+                 </div>
+                 <span className="font-black text-xs text-slate-600">التقارير المالية</span>
+              </button>
+           </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* الرسم البياني (AreaChart) */}

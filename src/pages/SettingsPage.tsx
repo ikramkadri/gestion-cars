@@ -2,7 +2,6 @@ import { useState, useRef } from 'react';
 import { Lock, Save, ShieldCheck, AlertCircle, Camera, Loader2, User, Calendar, Clock, Car, Image as ImageIcon, Store } from 'lucide-react';
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { BookingWithDetails } from '../types/app'; // Import from types/app
 import { toast } from 'react-hot-toast'; // Import toast
 
 export default function SettingsPage() {
@@ -82,7 +81,7 @@ export default function SettingsPage() {
 
     try {
       // 1. الحصول على رابط الرفع المؤقت
-      const postUrl = await generateUploadUrl({ token });
+      const postUrl = await generateUploadUrl();
       
       // 2. رفع الملف إلى Convex Storage
       const result = await fetch(postUrl, {
@@ -117,7 +116,7 @@ export default function SettingsPage() {
 
     setIsUploadingLogo(true);
     try {
-      const postUrl = await generateUploadUrl({ token });
+      const postUrl = await generateUploadUrl();
       const result = await fetch(postUrl, {
         method: "POST",
         headers: { "Content-Type": file.type },
@@ -126,7 +125,7 @@ export default function SettingsPage() {
       const { storageId } = await result.json();
 
       await updateSettings({ 
-        token,
+        token: token || "",
         logoImageId: storageId 
       });
 
@@ -237,7 +236,7 @@ export default function SettingsPage() {
           <p className="text-center text-slate-400 font-bold py-10 italic">ليس لديك أي حجوزات حالياً.</p>
         ) : (
           <div className="space-y-4">
-            {myBookings.map((booking: BookingWithDetails) => booking && (
+            {myBookings.map((booking) => booking && (
               <div key={booking._id} className="flex flex-col md:flex-row items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:shadow-md transition-all gap-4">
                 <div className="flex items-center gap-4 w-full md:w-auto">
                   <div className="w-16 h-12 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm">

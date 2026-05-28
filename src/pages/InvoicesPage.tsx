@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { SaleWithDetails } from '../types/app';
 import { Search, Printer, FileText, Calendar, User, Car as CarIcon, Loader2 } from 'lucide-react';
-import InvoiceModal from './InvoiceModal';
+import InvoiceClassic from '../components/InvoiceClassic';
 
 const InvoicesPage = () => {
   const token = localStorage.getItem("convex_token") || "";
@@ -16,17 +16,11 @@ const InvoicesPage = () => {
   const salesData = useQuery(api.sales.getRecentSales, { 
     token, 
     limit: 200,
-    searchTerm: searchTerm.toLowerCase().startsWith("inv-") ? searchTerm : undefined, // فقط إذا كان البحث برقم الفاتورة
+    searchTerm: searchTerm, // Pass searchTerm directly to backend
     isArchived: false, // الفواتير النشطة فقط
   }) as SaleWithDetails[] | undefined;
 
-  const filteredInvoices = useMemo(() => {
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    return salesData?.filter(sale =>
-      sale.customerName.toLowerCase().includes(lowerCaseSearchTerm) ||
-      sale.carName.toLowerCase().includes(lowerCaseSearchTerm)
-    ) || [];
-  }, [salesData, searchTerm]);
+  const filteredInvoices = salesData || []; // Ensure it's an array
 
   if (salesData === undefined) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FD]">
@@ -110,7 +104,7 @@ const InvoicesPage = () => {
         )}
       </div>
 
-      <InvoiceModal 
+      <InvoiceClassic 
         isOpen={isInvoiceOpen} 
         onClose={() => setIsInvoiceOpen(false)} 
         sale={selectedSale} 

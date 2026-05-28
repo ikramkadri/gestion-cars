@@ -1,5 +1,6 @@
+import { query, mutation, internalAction, internalMutation, QueryCtx, MutationCtx, ActionCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { mutation, query, internalAction, internalMutation, MutationCtx, QueryCtx, ActionCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 import { getAuthenticatedUser } from "./auth"; // Import getAuthenticatedUser
 import { internal } from "./_generated/api"; // استيراد internal لاستدعاء الدوال الداخلية
 
@@ -26,7 +27,16 @@ export const reserveCar = mutation({
     inspectionDate: v.optional(v.number()),
     bookingSource: v.optional(v.union(v.literal("website"), v.literal("whatsapp"), v.literal("phone_call"), v.literal("facebook"))),
   },
-  handler: async (ctx: MutationCtx, args) => {
+  handler: async (ctx: MutationCtx, args: {
+    carId: Id<"cars">;
+    token?: string;
+    guestName?: string;
+    customerPhone: string;
+    customerLocation: string;
+    message?: string;
+    inspectionDate?: number;
+    bookingSource?: "website" | "whatsapp" | "phone_call" | "facebook";
+  }) => {
     const user = await getAuthenticatedUser(ctx, args.token);
 
     // 1. تأمين البيانات: إذا كان المستخدم مسجلاً، نفضل استخدام بياناته الموثقة
@@ -85,6 +95,25 @@ export const reserveCar = mutation({
     });
 
     return bookingId;
+  },
+});
+
+/**
+ * جلب الحجز النشط لسيارة محددة (لأتمتة عملية البيع من المخزن)
+ */
+export const getActiveBookingForCar = query({
+  args: { carId: v.id("cars") },
+  handler: async (ctx: QueryCtx, args: { carId: Id<"cars"> }) => {
+    const booking = await ctx.db
+      .query("bookings")
+      .withIndex("by_car", (q) => q.eq("carId", args.carId))
+      .filter((q) => q.or(q.eq(q.field("status"), "pending"), q.eq(q.field("status"), "confirmed")))
+      .first();
+
+    if (!booking) return null;
+    
+    const client = booking.userId ? await ctx.db.get(booking.userId) : null;
+    return { ...booking, clientDetails: client };
   },
 });
 
@@ -161,14 +190,14 @@ export const getPendingBookings = query({
       throw new Error("غير مصرح لك.");
     }
 
-    const bookings = await ctx.db
+    const allBookings = await ctx.db
       .query("bookings")
-      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .filter((q) => q.or(q.eq(q.field("status"), "pending"), q.eq(q.field("status"), "confirmed")))
       .order("desc")
       .collect();
 
     return await Promise.all(
-      bookings.map(async (booking) => {
+      allBookings.map(async (booking) => {
         const car = await ctx.db.get(booking.carId);
         const client = booking.userId ? await ctx.db.get(booking.userId) : null; // يمكن أن يكون null إذا كان ضيفاً
         return { ...booking, carDetails: car, clientDetails: client };
@@ -308,17 +337,19 @@ export const rejectBooking = mutation({
 export const archiveOldBookings = internalMutation({
   args: {},
   handler: async (ctx: MutationCtx) => {
-    const ninetyDaysAgo = Date.now() - (90 * 24 * 60 * 60 * 1000);
+    const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
     const oldBookings = await ctx.db
       .query("bookings")
-      .withIndex("by_createdAt", (q: FilterBuilder<Doc<"bookings">>) => q.lt("createdAt", ninetyDaysAgo))
-      .filter((q) => q.or(
-        q.eq(q.field("status"), "cancelled"),
-        q.eq(q.field("status"), "rejected")
-      ))
+      .withIndex("by_createdAt", (q) => q.lt("createdAt", ninetyDaysAgo))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "cancelled"),
+          q.eq(q.field("status"), "rejected")
+        )
+      )
       .collect();
 
-    for (const booking of oldBookings) await ctx.db.patch(booking._id, { status: "archived", updatedAt: Date.now() });
-    console.log(`[Cleanup] Archived ${oldBookings.length} old bookings.`);
+    for (const booking of oldBookings) await ctx.db.delete(booking._id);
+    console.log(`[Cleanup] Deleted ${oldBookings.length} old cancelled/rejected bookings.`);
   },
 });

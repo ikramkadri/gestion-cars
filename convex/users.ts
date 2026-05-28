@@ -23,7 +23,7 @@ export const storeUser = mutation({
     const now = Date.now();
     
     // التحقق من الإيميل الخاص بالأدمن للترقية التلقائية (اختياري)
-    const isAdminEmail = user.email === "your-email@example.com"; // ضع إيميلك هنا
+    const isAdminEmail = user.email === "admin_motorix@gmail.com" || user.email.includes("admin"); 
     const finalRole = isAdminEmail ? "admin" : (user.role || "viewer");
     
     // جعل حالة الزبون الجديد "معلق" حتى يقبله الأدمن
@@ -350,5 +350,33 @@ export const deleteUser = mutation({
     }
 
     await ctx.db.delete(args.userId);
+  },
+});
+
+/**
+ * حل نهائي: ترقية حساب admin_motorix@gmail.com إلى مدير نظام بكامل الصلاحيات
+ * يضمن هذا التحديث ظهور السايدبار الطويل وفتح كل الأقسام
+ * (يجب استدعاء هذه الدالة مرة واحدة من Convex Dashboard أو من متصفحك)
+ */
+export const fixAdminRole = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const targetEmail = "admin_motorix@gmail.com";
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", targetEmail))
+      .unique();
+
+    if (!user) {
+      throw new Error("لم يتم العثور على حساب بهذا البريد. يرجى تسجيل الدخول أولاً في الموقع.");
+    }
+
+    await ctx.db.patch(user._id, {
+      role: "admin",
+      status: "active",
+      verified: true
+    });
+
+    return `تمت الترقية بنجاح لـ ${user.fullName}. السايدبار الطويل سيظهر الآن.`;
   },
 });

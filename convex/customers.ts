@@ -1,10 +1,10 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, QueryCtx, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth"; // Assuming this utility exists
 
 export const listCustomers = query({
   args: { token: v.optional(v.string()), searchTerm: v.optional(v.string()) },
-  handler: async (ctx, args) => {
+  handler: async (ctx: QueryCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || (user.role !== "admin" && user.role !== "sales_manager")) {
       throw new Error("غير مصرح لك بعرض الزبائن.");
@@ -42,7 +42,7 @@ export const updateCustomer = mutation({
     status: v.optional(v.string()),
     totalPurchases: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || (user.role !== "admin" && user.role !== "sales_manager")) {
       throw new Error("غير مصرح لك بتعديل الزبائن.");
@@ -61,7 +61,7 @@ export const updateCustomer = mutation({
 
 export const deleteCustomer = mutation({
   args: { token: v.string(), customerId: v.id("customers") },
-  handler: async (ctx, args) => {
+  handler: async (ctx: MutationCtx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || user.role !== "admin") { // فقط الأدمن يمكنه حذف الزبائن
       throw new Error("غير مصرح لك بحذف الزبائن.");
