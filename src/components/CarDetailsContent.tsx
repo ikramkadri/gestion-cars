@@ -11,6 +11,7 @@ import { Id } from '../../convex/_generated/dataModel';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLang } from '../lib/LanguageContext';
+import AboutUsSection from './AboutUsSection'; // Import the new component
 interface CarDetailsContentProps {
   car: CarType;
   siteSettings: {
@@ -463,18 +464,20 @@ const CarDetailsContent = ({ car, siteSettings }: CarDetailsContentProps) => {
                 </div>
 
                 <div className="flex flex-col gap-5 w-full md:w-auto">
-                   <button 
-                    onClick={() => {
-                      if (!token) {
-                        toast.error(lang === 'ar' ? "يرجى تسجيل الدخول لإتمام الحجز" : "Veuillez vous connecter pour réserver");
-                        return navigate('/login', { state: { from: location.pathname, pendingCarId: car._id } });
-                      }
-                      setIsBookingModalOpen(true);
-                    }}
-                    className="px-16 py-7 bg-blue-600 text-white rounded-[2.5rem] font-black text-2xl shadow-2xl shadow-blue-500/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-4"
-                   >
-                      <CalendarCheck size={32} /> {ui.viewing}
-                   </button>
+                   {car.status === "Available" && (
+                     <button 
+                      onClick={() => {
+                        if (!token) {
+                          toast.error(lang === 'ar' ? "يرجى تسجيل الدخول لإتمام الحجز" : "Veuillez vous connecter pour réserver");
+                          return navigate('/login', { state: { from: location.pathname, pendingCarId: car._id } });
+                        }
+                        setIsBookingModalOpen(true);
+                      }}
+                      className="px-16 py-7 bg-blue-600 text-white rounded-[2.5rem] font-black text-2xl shadow-2xl shadow-blue-500/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-4"
+                     >
+                        <CalendarCheck size={32} /> {ui.viewing}
+                     </button>
+                   )}
                    <div className="flex gap-4">
                       <a href={`tel:${siteSettings?.contactPhone}`} className="flex-1 py-5 bg-white dark:bg-white/5 rounded-2xl flex items-center justify-center gap-3 font-black text-sm border border-slate-200 dark:border-white/10 hover:bg-slate-50 transition-all shadow-sm">
                          <Phone size={20} className="text-blue-500" /> {ui.call}
@@ -548,25 +551,9 @@ const CarDetailsContent = ({ car, siteSettings }: CarDetailsContentProps) => {
             </div>
           </div>
         </div>
-
-        {/* Similar Cars Preview - واضحة فالثيمين ودعم اللغات */}
-        <div className="mt-40 space-y-12">
-           <div className="flex items-end justify-between border-b border-slate-200 dark:border-white/10 pb-10">
-              <div className="space-y-2">
-                <h2 className="text-4xl font-black text-slate-900 dark:text-white">{ui.similar}</h2>
-                <p className="text-slate-500 font-bold italic">{lang === 'ar' ? 'مختارات ذكية من فريقنا' : 'Smart recommendations'}</p>
-              </div>
-              <button className="flex items-center gap-3 text-blue-500 font-black text-base hover:translate-x-3 transition-transform">
-                {ui.all} {lang === 'ar' ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-              </button>
-           </div>
-           
-           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 opacity-60 pointer-events-none">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="aspect-[3/4] bg-slate-50 dark:bg-white/5 rounded-[4rem] border border-slate-200 dark:border-white/10 border-dashed shadow-sm" />
-              ))}
-           </div>
-        </div>
+        
+        {/* Replace "Similar Cars" with "About Us" section */}
+        <AboutUsSection />
       </div>
 
       {/* Modal طلب معاينة - دعم كامل للغات الثلاث */}

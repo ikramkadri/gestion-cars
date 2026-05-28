@@ -39,6 +39,12 @@ export const reserveCar = mutation({
   }) => {
     const user = await getAuthenticatedUser(ctx, args.token);
 
+    // 0. التحقق من حالة السيارة: لا يمكن حجز سيارة محجوزة أو مباعة
+    const car = await ctx.db.get(args.carId);
+    if (!car || car.status !== "Available") {
+      throw new Error("عذراً، هذه السيارة لم تعد متاحة للحجز (محجوزة أو مباعة بالفعل).");
+    }
+
     // 1. تأمين البيانات: إذا كان المستخدم مسجلاً، نفضل استخدام بياناته الموثقة
     const phone = user?.phone || args.customerPhone;
     const location = user?.address || args.customerLocation;
@@ -79,7 +85,6 @@ export const reserveCar = mutation({
     });
 
     // جلب تفاصيل السيارة لإنشاء رسالة الإشعار
-    const car = await ctx.db.get(args.carId);
     const carName = car ? `${car.make} ${car.model}` : "سيارة غير معروفة";
     const formattedDate = args.inspectionDate ? new Date(args.inspectionDate).toLocaleDateString('ar-DZ') : "لم يحدد";
 

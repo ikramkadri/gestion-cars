@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Truck, ShieldCheck, FileText, MapPin, CheckCircle2, X, MessageSquare } from 'lucide-react';
+import { Truck, ShieldCheck, FileText, MapPin, CheckCircle2, X } from 'lucide-react';
 import { SaleWithDetails } from '../types/app';
 
 interface DeliveryTrackerModalProps {
@@ -78,13 +78,8 @@ const DeliveryTrackerModal = ({ isOpen, onClose, sale }: DeliveryTrackerModalPro
          </div>
 
          {/* Footer Action */}
-         <div className="p-8 bg-slate-50 dark:bg-white/5 border-t border-slate-100 dark:border-white/5 flex gap-4">
-            <button className="flex-1 py-4 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-2xl font-black text-xs border border-slate-200 dark:border-white/10 hover:bg-slate-100 transition-all">
-              تحميل التقرير
-            </button>
-            <button className="flex-[2] py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2">
-              <MessageSquare size={16} /> التواصل مع منسق الشحن
-            </button>
+         <div className="p-8 bg-slate-50 dark:bg-white/5 border-t border-slate-100 dark:border-white/5 flex justify-center">
+            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">تتبع رحلة سيارتك خطوة بخطوة</p>
          </div>
        </motion.div>
     </div>

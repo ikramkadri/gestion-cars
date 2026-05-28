@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Heart, ChevronLeft, Gauge, Car, X,
@@ -134,9 +134,9 @@ const CarCard = ({ car, showRemoveButton }: CarCardProps) => {
           {/* Sold Overlay - التأثير الاحترافي للسيارات المباعة */}
           {car.status === "Sold" && (
             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-              <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px]" />
-              <div className="relative rotate-[-12deg] border-4 border-white/80 px-8 py-2 rounded-xl shadow-2xl animate-in zoom-in duration-500">
-                <span className="text-white text-4xl font-black uppercase tracking-tighter drop-shadow-lg">
+              <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-[1px]" />
+              <div className="relative rotate-[-12deg] border-2 border-white/90 px-4 py-1 rounded-lg shadow-2xl animate-in zoom-in duration-500 bg-slate-900/40">
+                <span className="text-white text-xl font-black uppercase tracking-tighter drop-shadow-lg">
                   مباعة - SOLD
                 </span>
               </div>
@@ -146,9 +146,9 @@ const CarCard = ({ car, showRemoveButton }: CarCardProps) => {
           {/* Reserved Overlay - التأثير الاحترافي للسيارات المحجوزة */}
           {car.status === "Reserved" && (
             <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-              <div className="absolute inset-0 bg-amber-900/20 backdrop-blur-[1px]" />
-              <div className="relative rotate-[-12deg] border-4 border-amber-400 px-8 py-2 rounded-xl shadow-2xl animate-in zoom-in duration-500 bg-amber-500/10">
-                <span className="text-amber-400 text-4xl font-black uppercase tracking-tighter drop-shadow-lg">
+              <div className="absolute inset-0 bg-amber-900/10 backdrop-blur-[0.5px]" />
+              <div className="relative rotate-[-12deg] border-2 border-amber-400 px-4 py-1 rounded-lg shadow-2xl animate-in zoom-in duration-500 bg-amber-500/20">
+                <span className="text-amber-400 text-xl font-black uppercase tracking-tighter drop-shadow-lg">
                   محجوزة - RESERVED
                 </span>
               </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Printer, Car, Loader2, Download, X } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import { useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
