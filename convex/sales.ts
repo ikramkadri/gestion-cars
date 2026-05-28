@@ -51,13 +51,26 @@ export const createSale = mutation({
     const sequence = (parseInt(lastSequence) + 1).toString().padStart(4, '0');
     const invoiceNumber = `INV-${currentYear}-${sequence}`;
 
-    const customer = await ctx.db.query("customers").withIndex("by_phone", (q) => q.eq("phone", args.phone)).unique();
+    let customer = await ctx.db.query("customers").withIndex("by_phone", (q) => q.eq("phone", args.phone)).unique();
     
     if (!customer) {
-      throw new Error("عذراً، هذا الزبون غير مسجل في النظام. يجب فتح حساب للزبون أولاً أو إضافته في قاعدة بيانات الزبائن برقم الهاتف هذا قبل إتمام عملية البيع لضمان التتبع القانوني.");
+      // إنشاء زبون جديد تلقائياً في حال عدم وجوده لتبسيط تجربة المستخدم
+      const newCustomerId = await ctx.db.insert("customers", {
+        fullName: args.customerName,
+        phone: args.phone,
+        address: args.address,
+        identityNum: args.identityNum,
+        status: "نشط",
+        totalPurchases: 0,
+        createdAt: now,
+        updatedAt: now,
+      });
+      customer = await ctx.db.get(newCustomerId);
     }
-
+    
+    if (!customer) throw new Error("فشل إنشاء أو جلب بيانات الزبون.");
     const customerId = customer._id;
+
     // تحديث إجمالي المشتريات للزبون الحالي
     await ctx.db.patch(customerId, {
       totalPurchases: (customer.totalPurchases || 0) + args.amountPaid,
