@@ -1,4 +1,4 @@
-import { mutation, query, action, internalAction, internalMutation, internalQuery, MutationCtx, QueryCtx } from "./_generated/server";
+import { mutation, query, action, internalMutation, internalQuery, MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth";
 import { internal } from "./_generated/api";
@@ -102,58 +102,6 @@ export const approveUser = mutation({
       isRead: false,
       createdAt: now,
     });
-
-    // إرسال بريد إلكتروني ترحيبي للزبون بعد التفعيل
-    await ctx.scheduler.runAfter(0, internal.users.sendWelcomeEmail, {
-      toEmail: targetUser.email,
-      customerName: targetUser.fullName,
-    });
-  },
-});
-
-/**
- * دالة شاملة لتشغيل إشعارات المستخدم الجديد (إيميل + هاتف)
- */
-export const triggerNewUserNotifications = internalAction({
-  args: { userId: v.id("users") },
-  handler: async (ctx, args) => {
-    const user = await ctx.runQuery(internal.auth.getUserByIdInternal, { userId: args.userId });
-    if (!user) return;
-
-    // 1. إرسال إيميل رابط التأكيد
-    const verificationLink = `https://motorix.dz/verify-email?token=${user.verificationToken}`;
-    console.log(`[EMAIL] To: ${user.email} | Link: ${verificationLink}`);
-    // هنا يتم الربط مع Resend أو SendGrid مستقبلاً
-
-    // 2. إرسال إشعار ترحيبي للهاتف (SMS أو WhatsApp)
-    if (user.phone) {
-      console.log(`[PHONE] Sending welcome notification to: ${user.phone}`);
-      // ملاحظة: هنا يمكنك استدعاء API خارجي مثل Twilio أو Infobip
-      // نص الرسالة المقترح:
-      // "مرحباً بك في MOTORIX! تم استلام طلب تسجيلك بنجاح. يرجى مراجعة بريدك الإلكتروني لتأكيد الحساب."
-    }
-  },
-});
-
-/**
- * دالة داخلية لإرسال بريد إلكتروني ترحيبي عند تفعيل الحساب.
- * لا يمكن استدعاؤها مباشرة من الواجهة الأمامية.
- */
-export const sendWelcomeEmail = internalAction({
-  args: {
-    toEmail: v.string(),
-    customerName: v.string(),
-  },
-  handler: async (ctx, args) => {
-    console.log(`Sending Welcome Email to: ${args.toEmail}`);
-    
-    // ملاحظة: هنا يمكنك دمج خدمة إرسال بريد حقيقية (مثل Resend أو SendGrid)
-    // حالياً نكتفي بطباعة العملية في السجل (Console)
-    console.log(`Subject: تم تفعيل حسابك في MOTORIX 🎉`);
-    console.log(`Body: مرحباً ${args.customerName}, تم تفعيل حسابك بنجاح. يمكنك الآن استكشاف وحجز سياراتك المفضلة.`);
-    
-    // مثال للربط مع خدمة خارجية مستقبلاً:
-    // await fetch("https://api.resend.com/emails", { ... });
   },
 });
 

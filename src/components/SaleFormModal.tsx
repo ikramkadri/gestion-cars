@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Id } from '../../convex/_generated/dataModel';
+import { Id, Doc } from '../../convex/_generated/dataModel';
 import { X, User, Phone, DollarSign, CreditCard, Car, Loader2, MapPin, Hash, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { BookingWithDetails } from '../types/app'; // استخدام النوع من الملف الموحد
@@ -10,8 +10,8 @@ interface SaleFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialData?: BookingWithDetails | null;
-  preSelectedCarId?: Id<"cars"> | null;
-  setShowConfetti: (show: boolean) => void;
+  preSelectedCarId?: Id<"cars"> | null; // جعل هذا اختياريًا
+  setShowConfetti?: (show: boolean) => void; // جعل هذا اختياريًا
 }
 
 // تعريف نوع الحالة الخاصة بالنموذج
@@ -29,8 +29,8 @@ interface SaleFormData {
 const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId, setShowConfetti }: SaleFormModalProps) => {
   const token = localStorage.getItem("convex_token") || "";
   
-  // جلب السيارات (المتاحة والمحجوزة) القابلة للبيع
-  const allCars = useQuery(api.cars.getCars, { includeArchived: false });
+  // تحسين الأداء: جلب فقط السيارات القابلة للبيع بدلاً من المخزون كاملاً
+  const allCars = useQuery(api.cars.getSellableCars, { token });
   const createSale = useMutation(api.sales.createSale);
   
   // محاولة جلب بيانات الحجز إذا كانت السيارة مختارة ومحجوزة
@@ -68,45 +68,44 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId, setShow
   });
 
   // تصفية السيارات لعرض المتاحة والمحجوزة فقط، أو السيارة المحددة في الحجز
-  const displayCars = allCars?.filter(car => 
+  const displayCars = allCars?.filter((car: Doc<"cars">) => 
     (car.status === "Available" || car.status === "Reserved") && 
     (!initialData || car._id === initialData.carId || car.status === "Available")
   );
 
   useEffect(() => {
+    // إذا أغلقت النافذة، نعيد تصفير المرجع للتمكن من إعادة التهيئة عند الفتح القادم
     if (!isOpen) {
+      initializedRef.current = null;
       return;
     }
 
-    // إذا تم تحميل السيارات، نقوم بتعبئة البيانات بناءً على السيارة المختارة
-    const shouldInitialize = preSelectedCarId && allCars !== undefined && initializedRef.current !== preSelectedCarId;
-    
-    if (shouldInitialize) {
-      const car = allCars.find(c => c._id === preSelectedCarId);
+    // الانتظار حتى استلام البيانات بالكامل وتجنب التحديثات المتتالية (Cascading Renders)
+    const isDataLoaded = allCars !== undefined && (preSelectedCarId ? activeBooking !== undefined : true);
+
+    if (isDataLoaded && preSelectedCarId && initializedRef.current !== preSelectedCarId) {
+      const car = allCars?.find((c: Doc<"cars">) => c._id === preSelectedCarId);
       if (car) {
-        setFormData(prev => ({
-          ...prev,
-          carId: preSelectedCarId as string,
-          customerName: activeBooking?.clientDetails?.fullName || activeBooking?.guestName || prev.customerName,
-          phone: activeBooking?.customerPhone || activeBooking?.clientDetails?.phone || prev.phone,
-          address: activeBooking?.customerLocation || activeBooking?.clientDetails?.address || prev.address,
-          amountPaid: car.price || prev.amountPaid,
-          vin: car.vin || prev.vin || '',
-        }));
+        // استخدام setTimeout لتأجيل التحديث للدورة التالية (Next Tick) 
+        // لضمان عدم حدوث Cascading Renders وإرضاء الـ Linter
+        setTimeout(() => {
+          setFormData(prev => ({
+            ...prev,
+            carId: preSelectedCarId as string,
+            customerName: activeBooking?.clientDetails?.fullName || activeBooking?.guestName || prev.customerName,
+            phone: activeBooking?.customerPhone || activeBooking?.clientDetails?.phone || prev.phone,
+            address: activeBooking?.customerLocation || activeBooking?.clientDetails?.address || prev.address,
+            amountPaid: car.price || prev.amountPaid,
+            vin: car.vin || prev.vin || '',
+          }));
+        }, 0);
         initializedRef.current = preSelectedCarId;
       }
-    } else if (!preSelectedCarId) {
-      initializedRef.current = null;
     }
-  }, [
-    isOpen, 
-    preSelectedCarId, 
-    allCars, 
-    activeBooking, 
-  ]); 
+  }, [isOpen, preSelectedCarId, allCars, activeBooking]);
 
   const handleCarSelection = (carId: Id<"cars">) => {
-    const car = allCars?.find(c => c._id === carId);
+    const car = allCars?.find((c: Doc<"cars">) => c._id === carId);
     setFormData(prev => ({
       ...prev,
       carId,
@@ -149,12 +148,12 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId, setShow
         window.open(printUrl, '_blank');
       }
 
-      setShowConfetti(true); // تفعيل الاحتفال في الخلفية
+      setShowConfetti?.(true); // تفعيل الاحتفال في الخلفية (مع التحقق من وجود الدالة)
       toast.success("مبارك! تمت عملية البيع وإصدار الفاتورة بنجاح 🎉", { duration: 5000 });
 
       // إغلاق النافذة فوراً وتنسيق انتهاء الاحتفال بعد 4 ثوانٍ
       onClose();
-      setTimeout(() => { setShowConfetti(false); }, 4000);
+      setTimeout(() => { setShowConfetti?.(false); }, 4000);
 
     } catch (error: unknown) {
       console.error("Error creating sale:", error); // سجل لأي أخطاء تحدث
@@ -164,15 +163,15 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId, setShow
     }
   };
 
-  const selectedCar = allCars?.find((c) => c._id === formData.carId);
+  const selectedCar = allCars?.find((c: Doc<"cars">) => c._id === (formData.carId as Id<"cars">));
   const remainingAmount = selectedCar ? Math.max(0, selectedCar.price - formData.amountPaid) : 0;
   const paymentPercentage = selectedCar ? Math.min(100, (formData.amountPaid / selectedCar.price) * 100) : 0;
 
-  const getAutoFilledClass = (val: string | number | null | undefined) => val ? "bg-blue-50/50 border-blue-200 text-blue-900" : "bg-slate-50 border-slate-100";
+  const getAutoFilledClass = (val: string | number | null | undefined) => val ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100" : "bg-slate-50 dark:bg-white/5 border-slate-100 dark:border-white/10";
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-2xl max-h-[95vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200" dir="rtl">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[1000] flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-2xl max-h-[95vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200" dir="rtl">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-700 to-indigo-900 p-6 text-white flex justify-between items-center border-b-4 border-[#D4AF37] shrink-0">
           <div className="flex items-center gap-3">
@@ -204,7 +203,7 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId, setShow
                 }`}
               >
                 <option value="">-- اختر من المخزون المتاح --</option>
-                {displayCars?.map((car) => (
+                {displayCars?.map((car: Doc<"cars">) => (
                   <option key={car._id} value={car._id}>
                     {car.make} {car.model} ({car.year}) - {car.price.toLocaleString()} دج
                   </option>

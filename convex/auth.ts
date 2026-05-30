@@ -1,6 +1,7 @@
-import { mutation, query, action, internalMutation, internalQuery, MutationCtx, QueryCtx } from "./_generated/server";
+import { mutation, query, action, internalMutation, internalQuery } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { Doc, Id } from "./_generated/dataModel";
+import { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import * as bcrypt from "bcryptjs"; 
 
@@ -59,11 +60,6 @@ export const authenticate = action({
       password: hashedPassword,
     });
 
-    // إرسال رسائل التحقق والترحيب في الخلفية
-    await ctx.runAction(internal.users.triggerNewUserNotifications, { 
-      userId: result.user._id 
-    });
-
     return result;
   },
 });
@@ -89,8 +85,6 @@ export const registerUserInternal = internalMutation({
       role: "viewer", // الافتراضي هو مشاهد، والأدمن يتم تعيينه يدوياً عبر Dashboard
       status: "pending",
       verified: false,
-      verificationToken: Math.random().toString(36).substring(2, 15), // توليد توكن فريد
-      verificationTokenExpires: now + (1000 * 60 * 60 * 24), // صالح لمدة 24 ساعة
       createdAt: now,
       updatedAt: now,
     });
@@ -136,34 +130,6 @@ export const createSessionInternal = internalMutation({
     const user = await ctx.db.get(args.userId);
     if (!user) throw new Error("Failed to retrieve user after session creation."); // إضافة تحقق لضمان عدم وجود null
     return { token: sessionToken, user };
-  },
-});
-
-/**
- * دالة تأكيد البريد الإلكتروني عبر التوكن
- */
-export const verifyEmail = mutation({
-  args: { token: v.string() },
-  handler: async (ctx, args) => {
-    const user = await ctx.db
-      .query("users")
-      .filter((q) => q.eq(q.field("verificationToken"), args.token))
-      .first();
-
-    if (!user) throw new Error("رابط التأكيد غير صالح.");
-    if (user.verificationTokenExpires! < Date.now()) throw new Error("انتهت صلاحية الرابط.");
-
-    await ctx.db.patch(user._id, {
-      verified: true,
-      verificationToken: undefined, // حذف التوكن بعد الاستخدام
-      verificationTokenExpires: undefined,
-      updatedAt: Date.now(),
-    });
-
-    return { 
-      success: true, 
-      message: "تم تأكيد بريدك الإلكتروني بنجاح! حسابك بانتظار مراجعة الأدمن الآن." 
-    };
   },
 });
 

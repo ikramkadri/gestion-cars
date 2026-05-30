@@ -20,7 +20,6 @@ export const updateSettings = mutation({
     showroomName: v.optional(v.string()),
     contactPhone: v.optional(v.string()),
     contactWhatsApp: v.optional(v.string()),
-    contactEmail: v.optional(v.string()),
     address: v.optional(v.string()),
     currency: v.optional(v.string()),
     logoImageId: v.optional(v.id("_storage")),

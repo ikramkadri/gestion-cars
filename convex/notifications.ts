@@ -1,13 +1,14 @@
-import { query, mutation, internalMutation, QueryCtx, MutationCtx } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth";
+import { Doc } from "./_generated/dataModel"; // استيراد Doc لتحديد أنواع البيانات
 
 /**
  * جلب عدد الإشعارات غير المقروءة للمستخدم الحالي أو الإشعارات العامة
  */
 export const getUnreadCount = query({
   args: { token: v.optional(v.string()) },
-  handler: async (ctx: QueryCtx, args) => {
+  handler: async (ctx, args) => {
     const unread = await ctx.db
       .query("notifications")
       .withIndex("by_read_status", (q) => q.eq("isRead", false))
@@ -17,7 +18,7 @@ export const getUnreadCount = query({
       const user = await getAuthenticatedUser(ctx, args.token);
       if (user) {
         const isManager = user.role === "admin" || user.role === "sales_manager";
-        return unread.filter((n) => 
+        return unread.filter((n: Doc<"notifications">) => 
           n.userId === user._id || (isManager && !n.userId)
         ).length;
       }
@@ -31,7 +32,7 @@ export const getUnreadCount = query({
  */
 export const getUnreadNotifications = query({
   args: { token: v.string() },
-  handler: async (ctx: QueryCtx, args) => {
+  handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) return [];
     
@@ -41,9 +42,9 @@ export const getUnreadNotifications = query({
       .collect();
 
     const isManager = user.role === "admin" || user.role === "sales_manager";
-    return unread
-      .filter((n) => n.userId === user._id || (isManager && !n.userId))
-      .sort((a, b) => b.createdAt - a.createdAt);
+    return (unread as Doc<"notifications">[]) // تأكيد النوع هنا
+      .filter((n: Doc<"notifications">) => n.userId === user._id || (isManager && !n.userId))
+      .sort((a: Doc<"notifications">, b: Doc<"notifications">) => b.createdAt - a.createdAt);
   },
 });
 
@@ -52,15 +53,15 @@ export const getUnreadNotifications = query({
  */
 export const getAllNotifications = query({
   args: { token: v.string() },
-  handler: async (ctx: QueryCtx, args) => {
+  handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) return [];
 
     const all = await ctx.db.query("notifications").collect();
     const isManager = user.role === "admin" || user.role === "sales_manager";
-    return all
-      .filter(n => n.userId === user._id || (isManager && !n.userId))
-      .sort((a, b) => b.createdAt - a.createdAt);
+    return (all as Doc<"notifications">[]) // تأكيد النوع هنا
+      .filter((n: Doc<"notifications">) => n.userId === user._id || (isManager && !n.userId))
+      .sort((a: Doc<"notifications">, b: Doc<"notifications">) => b.createdAt - a.createdAt);
   },
 });
 
@@ -69,7 +70,7 @@ export const getAllNotifications = query({
  */
 export const markAsRead = mutation({
   args: { token: v.string(), notificationId: v.id("notifications") },
-  handler: async (ctx: MutationCtx, args) => {
+  handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) throw new Error("Unauthorized");
 
@@ -85,7 +86,7 @@ export const markAsRead = mutation({
  */
 export const markAllAsRead = mutation({
   args: { token: v.string() },
-  handler: async (ctx: MutationCtx, args) => {
+  handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user) throw new Error("Unauthorized");
 
@@ -95,7 +96,7 @@ export const markAllAsRead = mutation({
       .collect();
 
     const isManager = user.role === "admin" || user.role === "sales_manager";
-    for (const notif of unread) {
+    for (const notif of (unread as Doc<"notifications">[])) { // تأكيد النوع هنا
       const isMyNotification = notif.userId === user._id;
       const isManagerNotification = isManager && !notif.userId;
 
@@ -108,7 +109,7 @@ export const markAllAsRead = mutation({
 
 export const deleteNotification = mutation({
   args: { token: v.string(), notificationId: v.id("notifications") },
-  handler: async (ctx: MutationCtx, args) => {
+  handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || user.role !== "admin") throw new Error("Admin access required");
     await ctx.db.delete(args.notificationId);
@@ -117,12 +118,12 @@ export const deleteNotification = mutation({
 
 export const clearAllNotifications = mutation({
   args: { token: v.optional(v.string()) },
-  handler: async (ctx: MutationCtx, args) => {
+  handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
     if (!user || user.role !== "admin") throw new Error("صلاحية الأدمن مطلوبة.");
 
     const notifs = await ctx.db.query("notifications").collect();
-    for (const n of notifs) {
+    for (const n of (notifs as Doc<"notifications">[])) { // تأكيد النوع هنا
       await ctx.db.delete(n._id);
     }
     return `تم حذف ${notifs.length} إشعار بنجاح.`;
@@ -135,14 +136,14 @@ export const clearAllNotifications = mutation({
  */
 export const clearOldNotifications = internalMutation({
   args: {},
-  handler: async (ctx: MutationCtx) => {
+  handler: async (ctx) => {
     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
     const oldNotifications = await ctx.db
       .query("notifications")
       .withIndex("by_createdAt", (q) => q.lt("createdAt", thirtyDaysAgo))
       .collect();
 
-    for (const notif of oldNotifications) await ctx.db.delete(notif._id);
+    for (const notif of (oldNotifications as Doc<"notifications">[])) await ctx.db.delete(notif._id); // تأكيد النوع هنا
     console.log(`[Cleanup] Deleted ${oldNotifications.length} old notifications.`);
   },
 });

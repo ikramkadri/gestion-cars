@@ -2,14 +2,14 @@
  * المسار: convex/statistics.ts
  * الوظيفة: تزويد لوحة التحكم بالأرقام المالية، حالة المخزون، وبيانات الرسم البياني للمبيعات الشهرية.
  */
-import { query, QueryCtx } from "./_generated/server";
+import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth";
 
 export const getDashboardStats = query({
   args: { token: v.optional(v.string()) },
-  handler: async (ctx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     const isAdmin = user?.role === "admin";
     const isSales = user?.role === "sales_manager";
 

@@ -72,7 +72,6 @@ export const seedCars = mutation({
       showroomName: "Motorix Showroom",
       contactPhone: "213550123456", // رقم هاتف افتراضي
       contactWhatsApp: "213550123456",
-      contactEmail: "contact@motorix.com",
       address: "123 Main St, Algiers, Algeria",
       currency: "DZD",
       updatedAt: Date.now(),

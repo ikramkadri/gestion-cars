@@ -57,8 +57,8 @@ export default defineSchema({
     role: v.union(v.literal("admin"), v.literal("sales_manager"), v.literal("viewer")),
     status: v.string(), // active, suspended, etc.
     verified: v.boolean(),
-    verificationToken: v.optional(v.string()), // توكن تأكيد الإيميل
-    verificationTokenExpires: v.optional(v.number()), // تاريخ انتهاء التوكن
+    verificationToken: v.optional(v.string()), // مضاف مؤقتاً لتوافق البيانات القديمة
+    verificationTokenExpires: v.optional(v.number()), // مضاف مؤقتاً لتوافق البيانات القديمة
     lastLogin: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -171,7 +171,7 @@ export default defineSchema({
     showroomName: v.string(),
     contactPhone: v.string(),
     contactWhatsApp: v.optional(v.string()),
-    contactEmail: v.string(),
+    contactEmail: v.optional(v.string()), // نتركه اختيارياً لتجنب تعارض البيانات القديمة في قاعدة البيانات
     address: v.string(),
     currency: v.string(), 
     logoImageId: v.optional(v.id("_storage")), // إضافة حقل لمعرف صورة الشعار
