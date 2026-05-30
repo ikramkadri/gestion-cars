@@ -73,7 +73,7 @@ const CarCard = ({ car, showRemoveButton }: CarCardProps) => {
     }
     
     if (car.imagesUrls && car.imagesUrls.length > 0) list.push(...car.imagesUrls.filter((url): url is string => url !== null && url !== undefined));
-    return list.length > 0 ? list : ["/images/placeholder-car.jpg"];
+    return list.length > 0 ? list : ["/images/placeholder-car.svg"];
   }, [car]);
  
   const [isHovered, setIsHovered] = useState(false);
