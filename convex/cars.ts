@@ -394,3 +394,25 @@ export const getCarById = query({
 export const generateUploadUrl = mutation(async (ctx) => {
   return await ctx.storage.generateUploadUrl();
 });
+
+/**
+ * جلب السيارات القابلة للبيع فقط (المتاحة والمحجوزة وغير المؤرشفة)
+ * تستخدم في نموذج تسجيل البيع SaleFormModal لتحسين الأداء
+ */
+export const getSellableCars = query({
+  args: { token: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("cars")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("isArchived"), false),
+          q.or(
+            q.eq(q.field("status"), "Available"),
+            q.eq(q.field("status"), "Reserved")
+          )
+        )
+      )
+      .collect();
+  },
+});

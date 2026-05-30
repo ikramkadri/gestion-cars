@@ -190,7 +190,14 @@ const CarCard = ({ car, showRemoveButton }: CarCardProps) => {
                   await toggleFavorite({ carId: car._id as Id<"cars">, token });
                   if(!isLiked) toast.success("تمت الإضافة للمفضلة ❤️");
                 } catch (error: unknown) {
-                  toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء تحديث المفضلة");
+                  const errorMessage = error instanceof Error ? error.message : "";
+                  // إذا كان الخطأ بسبب انتهاء الجلسة أو عدم تسجيل الدخول، نوجه المستخدم فوراً
+                  if (errorMessage.includes("تسجيل الدخول")) {
+                    localStorage.removeItem("convex_token"); // تنظيف التوكن التالف
+                    toast.error("انتهت جلستك، يرجى تسجيل الدخول مجدداً");
+                    return navigate('/login', { state: { from: window.location.pathname } });
+                  }
+                  toast.error(errorMessage || "حدث خطأ أثناء تحديث المفضلة");
                 }
               }}
               className={`p-3 rounded-xl backdrop-blur-xl border border-white/10 transition-all active:scale-90 ${

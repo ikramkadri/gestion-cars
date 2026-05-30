@@ -50,9 +50,9 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
     setIsGenerating(true);
     let html2pdf;
     try {
-      // @ts-ignore
+      // @ts-expect-error
       html2pdf = (await import('html2pdf.js')).default;
-    } catch (e) {
+    } catch {
       setIsGenerating(false);
       toast.error("يرجى تثبيت المكتبة أولاً: npm install html2pdf.js");
       return;
@@ -76,6 +76,30 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
       toast.error("حدث خطأ أثناء التحميل", { id: toastId });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // دالة مطورة للطباعة المباشرة عبر نافذة جديدة
+  const handlePrintDirect = () => {
+    const printContent = document.getElementById('printable-invoice');
+    if (!printContent) {
+      toast.error("لا يمكن العثور على محتوى الفاتورة للطباعة.");
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'height=800,width=800');
+    if (printWindow) {
+      // جلب جميع الستابلات والروابط (Tailwind) من الصفحة الحالية
+      const headContent = document.head.innerHTML;
+      
+      printWindow.document.write(`<html><head><title>الفاتورة - ${defaultSale.invoiceNumber}</title>`);
+      printWindow.document.write(headContent); // نسخ التنسيقات
+      printWindow.document.write('<style>@page { size: A4; margin: 0; } body { background: white !important; padding: 20px; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }</style>');
+      printWindow.document.write(`</head><body dir="rtl">`); // تحديد الاتجاه لترتيب العناصر
+      printWindow.document.write(printContent.innerHTML);
+      printWindow.document.write('</body></html>');
+      printWindow.document.close();
+      printWindow.print();
     }
   };
 
@@ -174,7 +198,7 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
 
         {/* Actions */}
         <div className="p-8 bg-slate-50 border-t flex justify-center gap-4 print:hidden">
-          <button onClick={() => window.print()} className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl active:scale-95">
+          <button onClick={handlePrintDirect} className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl active:scale-95">
             <Printer size={20}/> طباعة
           </button>
           <button disabled={isGenerating} onClick={handleDownloadPDF} className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl disabled:opacity-50 active:scale-95">
@@ -183,28 +207,33 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
           </button>
         </div>
       </div>
-
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          @page { margin: 10mm; size: a4; }
-          /* إخفاء كل شيء في الموقع */
-          body * { visibility: hidden; }
-          /* إظهار حاوية الفاتورة ومحتوياتها فقط */
-          #printable-invoice, #printable-invoice * { 
-            visibility: visible; 
+          @page {
+            size: A4;
+            margin: 10mm;
           }
+        
+          body {
+            background: white !important;
+          }
+        
+          .print\\:hidden,
+          button {
+            display: none !important;
+          }
+        
           #printable-invoice {
-            position: absolute; 
-            left: 0; 
-            top: 0; 
-            width: 100%;
-            padding: 0 !important;
-            margin: 0 !important;
+            display: block !important;
+            position: relative !important;
+            visibility: visible !important;
           }
-          .print\\:hidden, button, .backdrop-blur-md, [role="dialog"] > div:first-child { 
-            display: none !important; 
+        
+          .fixed.inset-0 {
+            position: static !important;
+            background: transparent !important;
+            backdrop-filter: none !important;
           }
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}} />
     </div>

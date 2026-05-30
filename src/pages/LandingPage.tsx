@@ -48,7 +48,7 @@ const FooterLink = ({ label, onClick }: FooterLinkProps) => {
     <li>
       <button 
         onClick={onClick} 
-        className={`text-slate-500 hover:text-blue-500 font-bold transition-all text-sm block py-1 w-full ${language === 'ar' ? 'text-right' : 'text-left'}`}
+        className={`text-slate-500 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 font-bold transition-all text-sm block py-1 w-full ${language === 'ar' ? 'text-right' : 'text-left'}`}
       >
         {label}
       </button>
@@ -95,23 +95,23 @@ const LandingPage = () => {
     booking: {
       title: t('how_to_book_title'),
       content: (
-        <div className={`space-y-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-          <p>{t('booking_steps_intro')}</p>
-          <ul className="list-disc list-inside space-y-2 text-slate-600">
+        <div className={`space-y-4 ${language === 'ar' ? 'text-right' : 'text-left'} text-slate-700 dark:text-slate-300`}>
+          <p className="font-bold">{t('booking_steps_intro')}</p>
+          <ul className="list-disc list-inside space-y-2 text-slate-600 dark:text-slate-400">
             <li>{t('booking_step_1')}</li>
             <li>{t('booking_step_2')}</li>
             <li>{t('booking_step_3')}</li>
           </ul>
-          <p className="font-black text-blue-600 italic">{t('booking_note')}</p>
+          <p className="font-black text-blue-600 dark:text-blue-400 italic">{t('booking_note')}</p>
         </div>
       )
     },
     finance: {
       title: t('finance_terms_title'),
       content: (
-        <div className={`space-y-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-          <p>{t('finance_intro')}</p>
-          <ul className="list-disc list-inside space-y-2 text-slate-600">
+        <div className={`space-y-4 ${language === 'ar' ? 'text-right' : 'text-left'} text-slate-700 dark:text-slate-300`}>
+          <p className="font-bold">{t('finance_intro')}</p>
+          <ul className="list-disc list-inside space-y-2 text-slate-600 dark:text-slate-400">
             <li>{t('finance_term_1')}</li>
             <li>{t('finance_term_2')}</li>
             <li>{t('finance_term_3')}</li>
@@ -122,7 +122,7 @@ const LandingPage = () => {
   }), [t, language]);
 
   const LEGAL_CONTENT = useMemo(() => (
-    <div className={`space-y-4 text-sm leading-relaxed ${language === 'ar' ? 'text-right' : 'text-left'} text-slate-600`}>
+    <div className={`space-y-4 text-sm leading-relaxed ${language === 'ar' ? 'text-right' : 'text-left'} text-slate-600 dark:text-slate-400 font-medium`}>
       <p>• {t('legal_usage')}</p>
       <p>• {t('legal_privacy')}</p>
       <p>• {t('legal_security')}</p>
@@ -597,31 +597,27 @@ const LandingPage = () => {
 
             {/* Column 2: Help Center */}
             <div className={`space-y-6 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-               <h4 className="font-black text-blue-600 flex items-center gap-2"><HelpCircle size={18} /> {t('help_center')}</h4>
+               <h4 className="font-black text-blue-600 dark:text-blue-400 flex items-center gap-2"><HelpCircle size={18} /> {t('help_center')}</h4>
                <ul className="space-y-4">
                   <FooterLink label={t('how_to_book')} onClick={() => setHelpModal({ ...HELP_DATA.booking, isOpen: true })} />
                   <FooterLink label={t('finance_terms')} onClick={() => setHelpModal({ ...HELP_DATA.finance, isOpen: true })} />
-                  <FooterLink label={t('motorix_guarantee')} onClick={() => setHelpModal({ ...HELP_DATA.booking, isOpen: true })} />
-                  <FooterLink label={t('faq')} onClick={() => setHelpModal({ ...HELP_DATA.booking, isOpen: true })} />
                </ul>
             </div>
 
             {/* Column 3: Support */}
             <div className={`space-y-6 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-               <h4 className="font-black text-emerald-500 flex items-center gap-2"><Shield size={18} /> {t('support_policies')}</h4>
+               <h4 className="font-black text-emerald-500 dark:text-emerald-400 flex items-center gap-2"><Shield size={18} /> {t('support_policies')}</h4>
                <ul className="space-y-4">
                   <FooterLink label={t('privacy_policy')} onClick={() => setHelpModal({ title: t('privacy_policy'), content: LEGAL_CONTENT, isOpen: true })} />
                   <FooterLink label={t('terms_of_use')} onClick={() => setHelpModal({ title: t('terms_of_use'), content: LEGAL_CONTENT, isOpen: true })} />
-                  <FooterLink label={t('after_sales')} onClick={() => setHelpModal({ ...HELP_DATA.booking, isOpen: true })} />
-                  <FooterLink label={t('make_complaint')} onClick={() => setHelpModal({ ...HELP_DATA.booking, isOpen: true })} />
                </ul>
             </div>
 
             {/* Column 4: Contact & Message */}
             <div className={`space-y-6 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-               <h4 className="font-black text-rose-500 flex items-center gap-2">{t('contact_us')}</h4>
+               <h4 className="font-black text-rose-500 dark:text-rose-400 flex items-center gap-2">{t('contact_us')}</h4>
                <div className={`space-y-4 bg-white dark:bg-white/5 p-6 rounded-[2rem] border border-slate-100 dark:border-white/10 shadow-inner ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                  <a href={`tel:${settings?.contactPhone || '0659618904'}`} className="flex items-center gap-3 text-slate-700 dark:text-slate-300 font-black text-sm hover:text-blue-600 transition-colors">
+                  <a href={`tel:${settings?.contactPhone || '0659618904'}`} className="flex items-center gap-3 text-slate-700 dark:text-slate-200 font-black text-sm hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                     <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600"><Phone size={16} /></div> 
                     {settings?.contactPhone || "0659618904"}
                   </a>

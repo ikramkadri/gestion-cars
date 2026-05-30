@@ -1,16 +1,6 @@
-import { query, mutation, internalAction, internalMutation, QueryCtx, MutationCtx, ActionCtx } from "./_generated/server";
+import { query, mutation, internalMutation, QueryCtx, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
 import { getAuthenticatedUser } from "./auth"; // Import getAuthenticatedUser
-import { internal } from "./_generated/api"; // استيراد internal لاستدعاء الدوال الداخلية
-
-/** تعريف لمتغيرات البيئة لتجنب أخطاء TypeScript و ESLint */
-declare const process: {
-  env: {
-    CONVEX_APP_URL?: string;
-    [key: string]: string | undefined;
-  };
-};
 
 /**
  * دالة حجز سيارة للمعاينة
@@ -27,16 +17,7 @@ export const reserveCar = mutation({
     inspectionDate: v.optional(v.number()),
     bookingSource: v.optional(v.union(v.literal("website"), v.literal("whatsapp"), v.literal("phone_call"), v.literal("facebook"))),
   },
-  handler: async (ctx: MutationCtx, args: {
-    carId: Id<"cars">;
-    token?: string;
-    guestName?: string;
-    customerPhone: string;
-    customerLocation: string;
-    message?: string;
-    inspectionDate?: number;
-    bookingSource?: "website" | "whatsapp" | "phone_call" | "facebook";
-  }) => {
+  handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx, args.token);
 
     // 0. التحقق من حالة السيارة: لا يمكن حجز سيارة محجوزة أو مباعة
@@ -108,7 +89,7 @@ export const reserveCar = mutation({
  */
 export const getActiveBookingForCar = query({
   args: { carId: v.id("cars") },
-  handler: async (ctx: QueryCtx, args: { carId: Id<"cars"> }) => {
+  handler: async (ctx, args) => {
     const booking = await ctx.db
       .query("bookings")
       .withIndex("by_car", (q) => q.eq("carId", args.carId))
@@ -119,43 +100,6 @@ export const getActiveBookingForCar = query({
     
     const client = booking.userId ? await ctx.db.get(booking.userId) : null;
     return { ...booking, clientDetails: client };
-  },
-});
-
-/**
- * دالة داخلية لإرسال بريد إلكتروني للزبون عند تحديث حالة الحجز.
- * لا يمكن استدعاؤها مباشرة من الواجهة الأمامية.
- */
-export const sendBookingEmail = internalAction({
-  args: {
-    toEmail: v.string(),
-    customerName: v.string(),
-    carName: v.string(),
-    status: v.union(v.literal("confirmed"), v.literal("rejected")),
-    bookingLink: v.string(),
-    reason: v.optional(v.string()), // لسبب الرفض
-  },
-  handler: async (ctx: ActionCtx, args) => {
-    console.log(`Sending email to: ${args.toEmail}`);
-    console.log(`Subject: طلب حجز سيارة ${args.status === "confirmed" ? "تم قبوله" : "تم رفضه"}`);
-    console.log(`Body: مرحباً ${args.customerName},`);
-    console.log(`   طلب حجزك لسيارة ${args.carName} ${args.status === "confirmed" ? "تم قبوله." : "تم رفضه."}`);
-    if (args.status === "rejected" && args.reason) {
-      console.log(`   السبب: ${args.reason}`);
-    }
-    console.log(`   يمكنك مراجعة تفاصيل الحجز هنا: ${args.bookingLink}`);
-    console.log("   شكراً لك.");
-
-    // هنا يمكنك دمج خدمة إرسال البريد الإلكتروني الفعلية (مثل SendGrid, Mailgun, Nodemailer)
-    // مثال (افتراضي):
-    /*
-    const response = await fetch("https://api.emailservice.com/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.EMAIL_SERVICE_API_KEY}` },
-      body: JSON.stringify({ to: args.toEmail, from: "no-reply@motorix.com", subject: `طلب حجز سيارة ${args.status === "confirmed" ? "تم قبوله" : "تم رفضه"}`, html: `<p>مرحباً ${args.customerName},</p><p>طلب حجزك لسيارة <strong>${args.carName}</strong> ${args.status === "confirmed" ? "تم قبوله." : "تم رفضه."}</p>${args.status === "rejected" && args.reason ? `<p>السبب: ${args.reason}</p>` : ""}<p>يمكنك مراجعة تفاصيل الحجز هنا: <a href="${args.bookingLink}">صفحة حجوزاتي</a></p><p>شكراً لك.</p>`, }),
-    });
-    if (!response.ok) { const errorText = await response.text(); console.error("Failed to send email:", errorText); throw new Error("Failed to send email notification."); }
-    */
   },
 });
 
@@ -242,7 +186,6 @@ export const approveBooking = mutation({
     await ctx.db.patch(args.bookingId, { status: "confirmed", updatedAt: Date.now() });
 
     const car = await ctx.db.get(booking.carId);
-    const customer = booking.userId ? await ctx.db.get(booking.userId) : null;
 
     // إذا تم قبول الحجز، نغير حالة السيارة إلى "محجوزة" لمنع تداخل المبيعات
     await ctx.db.patch(booking.carId, {
@@ -251,8 +194,6 @@ export const approveBooking = mutation({
     });
 
     const carName = car ? `${car.make} ${car.model}` : "السيارة";
-    const customerEmail = customer?.email; // البريد الإلكتروني للمستخدم المسجل
-    const customerName = customer?.fullName || booking.guestName || "العميل"; // اسم الزبون من المستخدم أو الضيف
 
     // إرسال إشعار للنظام الداخلي فقط إذا كان الزبون مسجلاً، لتجنب ظهوره للأدمن كإشعار موجه لنفسه
     if (booking.userId) {
@@ -265,17 +206,6 @@ export const approveBooking = mutation({
         isRead: false,
         actionUrl: "/my-bookings",
         createdAt: Date.now(),
-      });
-    }
-
-    // إرسال بريد إلكتروني للزبون
-    if (customerEmail) {
-      await ctx.scheduler.runAfter(0, internal.bookings.sendBookingEmail, {
-        toEmail: customerEmail,
-        customerName: customerName,
-        carName: carName,
-        status: "confirmed",
-        bookingLink: `${process.env.CONVEX_APP_URL ?? ""}/admin/bookings`, // رابط صفحة حجوزات الزبون
       });
     }
   },
@@ -299,13 +229,6 @@ export const rejectBooking = mutation({
     const booking = await ctx.db.get(args.bookingId);
 
     if (booking) {
-      const car = await ctx.db.get(booking.carId);
-      const customer = booking.userId ? await ctx.db.get(booking.userId) : null;
-
-      const carName = car ? `${car.make} ${car.model}` : "السيارة";
-      const customerEmail = customer?.email; // البريد الإلكتروني للمستخدم المسجل
-      const customerName = customer?.fullName || booking.guestName || "العميل"; // اسم الزبون من المستخدم أو الضيف
-
       // إرسال إشعار الرفض للزبون فقط إذا كان يملك حساباً
       if (booking.userId) {
         await ctx.db.insert("notifications", {
@@ -317,18 +240,6 @@ export const rejectBooking = mutation({
           isRead: false,
           actionUrl: "/my-bookings",
           createdAt: Date.now()
-        });
-      }
-
-      // إرسال بريد إلكتروني للزبون
-      if (customerEmail) {
-        await ctx.scheduler.runAfter(0, internal.bookings.sendBookingEmail, {
-          toEmail: customerEmail,
-          customerName: customerName,
-          carName: carName,
-          status: "rejected",
-          bookingLink: `${process.env.CONVEX_APP_URL ?? ""}/admin/bookings`, // رابط صفحة حجوزات الزبون
-          reason: args.reason,
         });
       }
     }

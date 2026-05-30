@@ -19,7 +19,6 @@ import type * as invoices from "../invoices.js";
 import type * as notifications from "../notifications.js";
 import type * as sales from "../sales.js";
 import type * as seed from "../seed.js";
-import type * as sendEmail from "../sendEmail.js";
 import type * as siteSettings from "../siteSettings.js";
 import type * as site_settings from "../site_settings.js";
 import type * as statistics from "../statistics.js";
@@ -43,7 +42,6 @@ declare const fullApi: ApiFromModules<{
   notifications: typeof notifications;
   sales: typeof sales;
   seed: typeof seed;
-  sendEmail: typeof sendEmail;
   siteSettings: typeof siteSettings;
   site_settings: typeof site_settings;
   statistics: typeof statistics;
