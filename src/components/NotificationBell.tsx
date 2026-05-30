@@ -29,8 +29,8 @@ const NotificationBell = () => {
   const handleMarkAsRead = async (id: Id<"notifications">) => {
     try {
       await markAsRead({ token, notificationId: id });
-    } catch (error) {
-      console.error("خطأ في تحديد الإشعار كمقروء:", error); // error is implicitly any
+    } catch (error: unknown) {
+      console.error("خطأ في تحديد الإشعار كمقروء:", error);
     }
   };
 

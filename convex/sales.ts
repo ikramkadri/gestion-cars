@@ -3,9 +3,8 @@
  * الوظيفة: إتمام صفقات البيع، توليد أرقام الفواتير، والتحقق من القواعد المالية.
  */
 
-import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { Doc } from "./_generated/dataModel";
 import { getAuthenticatedUser } from "./auth";
 
 export const createSale = mutation({
@@ -24,23 +23,37 @@ export const createSale = mutation({
     paymentMethod: v.union(v.literal("Cash"), v.literal("Bank Transfer"), v.literal("Card"), v.literal("Check")),
     token: v.string() // Token should not be optional for authenticated mutations
   },
-  handler: async (ctx: MutationCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, {
+    carId,
+    bookingId,
+    customerName,
+    phone,
+    address,
+    identityNum,
+    amountPaid,
+    taxAmount,
+    registrationFees,
+    vin,
+    mileageAtSale,
+    paymentMethod,
+    token
+  }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user) throw new Error("غير مصرح لك.");
 
     // منع إدخال نصوص فارغة برمجياً
-    if (!args.customerName.trim()) throw new Error("اسم الزبون لا يمكن أن يكون فارغاً.");
-    if (!args.phone.trim()) throw new Error("رقم الهاتف لا يمكن أن يكون فارغاً.");
-    if (!args.address.trim()) throw new Error("العنوان مطلوب.");
-    if (!args.identityNum.trim()) throw new Error("رقم الهوية NIN مطلوب.");
+    if (!customerName.trim()) throw new Error("اسم الزبون لا يمكن أن يكون فارغاً.");
+    if (!phone.trim()) throw new Error("رقم الهاتف لا يمكن أن يكون فارغاً.");
+    if (!address.trim()) throw new Error("العنوان مطلوب.");
+    if (!identityNum.trim()) throw new Error("رقم الهوية NIN مطلوب.");
 
     // صلاحيات الأدمن أو مدير المبيعات فقط
     if (user.role !== "admin" && user.role !== "sales_manager") throw new Error("لا تملك صلاحية البيع.");
 
-    const car = await ctx.db.get(args.carId);
+    const car = await ctx.db.get(carId);
     if (!car || (car.status !== "Available" && car.status !== "Reserved") || car.isArchived) throw new Error("السيارة غير متاحة للبيع");
 
-    if (args.amountPaid < car.price) throw new Error("عذراً، يجب دفع كامل مبلغ السيارة (100%) لإتمام عملية البيع وإصدار الفاتورة.");
+    if (amountPaid < car.price) throw new Error("عذراً، يجب دفع كامل مبلغ السيارة (100%) لإتمام عملية البيع وإصدار الفاتورة.");
 
     const now = Date.now();
     
@@ -51,15 +64,15 @@ export const createSale = mutation({
     const sequence = (parseInt(lastSequence) + 1).toString().padStart(4, '0');
     const invoiceNumber = `INV-${currentYear}-${sequence}`;
 
-    let customer = await ctx.db.query("customers").withIndex("by_phone", (q) => q.eq("phone", args.phone)).unique();
+    let customer = await ctx.db.query("customers").withIndex("by_phone", (q) => q.eq("phone", phone)).unique();
     
     if (!customer) {
       // إنشاء زبون جديد تلقائياً في حال عدم وجوده لتبسيط تجربة المستخدم
       const newCustomerId = await ctx.db.insert("customers", {
-        fullName: args.customerName,
-        phone: args.phone,
-        address: args.address,
-        identityNum: args.identityNum,
+        fullName: customerName,
+        phone: phone,
+        address: address,
+        identityNum: identityNum,
         status: "نشط",
         totalPurchases: 0,
         createdAt: now,
@@ -73,19 +86,19 @@ export const createSale = mutation({
 
     // تحديث إجمالي المشتريات للزبون الحالي
     await ctx.db.patch(customerId, {
-      totalPurchases: (customer.totalPurchases || 0) + args.amountPaid,
+      totalPurchases: (customer.totalPurchases || 0) + amountPaid,
       updatedAt: now
     });
 
-    await ctx.db.patch(args.carId, { status: "Sold", updatedAt: now });
+    await ctx.db.patch(carId, { status: "Sold", updatedAt: now });
 
     // تحديد الحجز المراد تأكيده: نستخدم المعرف المباشر إذا توفر، أو نبحث عن أول حجز معلق
     // إصلاح أمني: البحث عن الحجز الذي يطابق السيارة ورقم هاتف المشتري حصراً
-    const pendingBooking = args.bookingId 
-      ? await ctx.db.get(args.bookingId) 
+    const pendingBooking = bookingId 
+      ? await ctx.db.get(bookingId) 
       : await ctx.db
           .query("bookings")
-          .withIndex("by_car", (q) => q.eq("carId", args.carId))
+          .withIndex("by_car", (q) => q.eq("carId", carId))
           .filter((q) => 
             q.and(
               // التعديل: دعم الحجوزات التي تم تأكيد معاينتها مسبقاً
@@ -93,7 +106,7 @@ export const createSale = mutation({
                 q.eq(q.field("status"), "pending"),
                 q.eq(q.field("status"), "confirmed")
               ),
-              q.eq(q.field("customerPhone"), args.phone)
+              q.eq(q.field("customerPhone"), phone)
             )
           )
           .first();
@@ -119,28 +132,28 @@ export const createSale = mutation({
     
     const saleId = await ctx.db.insert("sales", {
       invoiceNumber,
-      customerName: args.customerName, // Populate denormalized field
+      customerName: customerName, // Populate denormalized field
       carName: car.make + " " + car.model, // Populate denormalized field
-      carId: args.carId,
-      bookingId: args.bookingId || pendingBooking?._id, // حفظ رابط الحجز في سجل البيع
+      carId: carId,
+      bookingId: bookingId || pendingBooking?._id, // حفظ رابط الحجز في سجل البيع
       customerId: customerId, // الآن TypeScript متأكد أن المعرف متاح
       userId: pendingBooking?.userId, // ربط الفاتورة بالمستخدم صاحب الحجز
       sellerId: user._id, 
       saleDate: now, 
-      amountPaid: args.amountPaid, 
-      taxAmount: args.taxAmount || 0,
-      registrationFees: args.registrationFees || 0,
-      subtotal: args.amountPaid - (args.taxAmount || 0) - (args.registrationFees || 0),
-      vin: args.vin || "",
-      mileageAtSale: args.mileageAtSale || car.mileage,
-      paymentMethod: args.paymentMethod, 
+      amountPaid: amountPaid, 
+      taxAmount: taxAmount || 0,
+      registrationFees: registrationFees || 0,
+      subtotal: amountPaid - (taxAmount || 0) - (registrationFees || 0),
+      vin: vin || "",
+      mileageAtSale: mileageAtSale || car.mileage,
+      paymentMethod: paymentMethod, 
       deliveryStatus: "processed",
       isArchived: false,
       createdAt: now, 
       updatedAt: now,
     });
 
-    await ctx.db.insert("notifications", { title: "بيع ناجح ✅", message: `تم بيع ${car.make} لـ ${args.customerName}`, type: "success", priority: "medium", isRead: false, createdAt: now });
+    await ctx.db.insert("notifications", { title: "بيع ناجح ✅", message: `تم بيع ${car.make} لـ ${customerName}`, type: "success", priority: "medium", isRead: false, createdAt: now });
     await ctx.db.insert("activity_logs", { action: "SALE_CREATED", details: `فاتورة ${invoiceNumber}`, userId: user._id, createdAt: now });
 
     return saleId;
@@ -152,14 +165,14 @@ export const createSale = mutation({
  */
 export const toggleSaleArchive = mutation({
   args: { token: v.string(), saleId: v.id("sales") },
-  handler: async (ctx: MutationCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token, saleId }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user || user.role !== "admin") throw new Error("للأدمن فقط.");
 
-    const sale = await ctx.db.get(args.saleId);
+    const sale = await ctx.db.get(saleId);
     if (!sale) throw new Error("العملية غير موجودة");
 
-    await ctx.db.patch(args.saleId, { isArchived: !sale.isArchived, updatedAt: Date.now() });
+    await ctx.db.patch(saleId, { isArchived: !sale.isArchived, updatedAt: Date.now() });
   },
 });
 
@@ -172,14 +185,14 @@ export const updateDeliveryStatus = mutation({
     saleId: v.id("sales"), 
     status: v.union(v.literal("processed"), v.literal("quality_check"), v.literal("shipped"), v.literal("delivered")) 
   },
-  handler: async (ctx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token, saleId, status }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user || (user.role !== "admin" && user.role !== "sales_manager")) throw new Error("صلاحية مطلوبة.");
 
-    const sale = await ctx.db.get(args.saleId);
+    const sale = await ctx.db.get(saleId);
     if (!sale) throw new Error("عملية البيع غير موجودة");
 
-    await ctx.db.patch(args.saleId, { deliveryStatus: args.status, updatedAt: Date.now() });
+    await ctx.db.patch(saleId, { deliveryStatus: status, updatedAt: Date.now() });
 
     // إرسال إشعار فوري للزبون عند تحديث رحلة السيارة
     if (sale.userId) {
@@ -187,9 +200,9 @@ export const updateDeliveryStatus = mutation({
         userId: sale.userId,
         title: "تحديث تتبع النقل 🚚",
         message: `تم تحديث حالة توصيل سيارتك إلى: ${
-          args.status === "quality_check" ? "فحص الجودة النهائي" : 
-          args.status === "shipped" ? "في الطريق إليك" : 
-          args.status === "delivered" ? "تم التسليم بنجاح" : "تجهيز الوثائق"
+          status === "quality_check" ? "فحص الجودة النهائي" : 
+          status === "shipped" ? "في الطريق إليك" : 
+          status === "delivered" ? "تم التسليم بنجاح" : "تجهيز الوثائق"
         }`,
         type: "info",
         isRead: false,
@@ -204,8 +217,8 @@ export const updateDeliveryStatus = mutation({
  */
 export const getRecentSales = query({
   args: { token: v.optional(v.string()), limit: v.optional(v.number()), searchTerm: v.optional(v.string()), isArchived: v.optional(v.boolean()) },
-  handler: async (ctx: QueryCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token, limit, searchTerm, isArchived }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     
     if (!user) return []; 
 
@@ -227,19 +240,19 @@ export const getRecentSales = query({
     }
 
     // تصفية حسب حالة الأرشفة
-    if (args.isArchived !== undefined) {
-      salesQuery = salesQuery.filter((q) => q.eq(q.field("isArchived"), args.isArchived));
+    if (isArchived !== undefined) {
+      salesQuery = salesQuery.filter((q) => q.eq(q.field("isArchived"), isArchived));
     }
 
-    let sales: Doc<"sales">[];
+    let sales;
 
     // تصفية المبيعات حسب البحث
-    if (args.searchTerm) {
+    if (searchTerm) {
       sales = await ctx.db
         .query("sales")
         .withSearchIndex("search_sales", (q) =>
-          q.search("customerName", args.searchTerm!).eq("isArchived", args.isArchived ?? false)
-        ).take(args.limit ?? 100);
+          q.search("customerName", searchTerm).eq("isArchived", isArchived ?? false)
+        ).take(limit ?? 100);
 
       // تطبيق فلترة الصلاحيات يدوياً بعد البحث (لأن Search Index لا يدعم الفلترة المتقدمة)
       if (user.role === "sales_manager") {
@@ -248,7 +261,7 @@ export const getRecentSales = query({
         sales = sales.filter((s) => s.userId === user._id);
       }
     } else {
-      sales = await salesQuery.order("desc").take(args.limit ?? 100);
+      sales = await salesQuery.order("desc").take(limit ?? 100);
     }
 
     return await Promise.all(

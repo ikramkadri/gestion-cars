@@ -1,4 +1,4 @@
-import { mutation, query, MutationCtx, QueryCtx } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth";
 import { Doc, Id } from "./_generated/dataModel"; // تأكد من استيراد Doc
@@ -88,40 +88,62 @@ export const addCar = mutation({
     color: v.optional(v.string()),
     condition: v.union(v.literal("New"), v.literal("Excellent"), v.literal("Good"), v.literal("Fair"), v.literal("Poor")),
   },
-  handler: async (ctx: MutationCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, {
+    token,
+    make,
+    model,
+    origin,
+    year,
+    description,
+    images,
+    mainImage,
+    purchasePrice,
+    price,
+    mileage,
+    vin,
+    location,
+    hasWarranty,
+    cylinders,
+    fuel,
+    transmission,
+    drivetrain,
+    engineSize,
+    color,
+    condition
+  }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user || user.role === "viewer") {
       throw new Error("عذراً، لا تملك صلاحية إضافة سيارات.");
     }
 
     const now = Date.now();
-    const slug = `${args.make}-${args.model}-${now}`.toLowerCase().replace(/ /g, "-");
-    const searchName = generateSearchName(args.make, args.model, args.year, args.location);
+    const slug = `${make}-${model}-${now}`.toLowerCase().replace(/ /g, "-");
+    const searchName = generateSearchName(make, model, year, location);
 
     const carData: CarInsertData = {
-      make: args.make,
-      model: args.model,
+      make: make,
+      model: model,
       searchName: searchName,
-      origin: args.origin,
-      year: args.year,
-      description: args.description,
-      images: args.images,
-      mainImage: args.mainImage,
-      purchasePrice: args.purchasePrice,
-      price: args.price,
-      mileage: args.mileage,
-      vin: args.vin,
-      location: args.location,
+      origin: origin,
+      year: year,
+      description: description,
+      images: images,
+      mainImage: mainImage,
+      purchasePrice: purchasePrice,
+      price: price,
+      mileage: mileage,
+      vin: vin,
+      location: location,
       sellerId: user._id,
       slug: slug,
-      hasWarranty: args.hasWarranty,
-      cylinders: args.cylinders,
-      fuel: args.fuel,
-      transmission: args.transmission,
-      drivetrain: args.drivetrain,
-      engineSize: args.engineSize,
-      color: args.color,
-      condition: args.condition,
+      hasWarranty: hasWarranty,
+      cylinders: cylinders,
+      fuel: fuel,
+      transmission: transmission,
+      drivetrain: drivetrain,
+      engineSize: engineSize,
+      color: color,
+      condition: condition,
       viewCount: 0,
       status: "Available",
       isArchived: false,
@@ -133,7 +155,7 @@ export const addCar = mutation({
 
     await ctx.db.insert("notifications", {
       title: "سيارة جديدة بالمخزن 🚘",
-      message: `تمت إضافة ${args.make} ${args.model} بواسطة ${user.fullName}`,
+      message: `تمت إضافة ${make} ${model} بواسطة ${user.fullName}`,
       type: "success",
       priority: "medium",
       isRead: false,
@@ -176,27 +198,27 @@ export const updateCar = mutation({
       isArchived: v.optional(v.boolean()),
     }),
   },
-  handler: async (ctx: MutationCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token, carId, updates }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user || (user.role !== "admin" && user.role !== "sales_manager")) throw new Error("غير مصرح لك بتعديل السيارات");
 
-    const existingCar = await ctx.db.get(args.carId);
+    const existingCar = await ctx.db.get(carId);
     if (!existingCar) throw new Error("السيارة غير موجودة.");
 
     // تحديث نص البحث إذا تغيرت أي من الحقول الأساسية أو الموقع
     let searchName = existingCar.searchName;
-    if (args.updates.make !== undefined || args.updates.model !== undefined || 
-        args.updates.year !== undefined || args.updates.location !== undefined) {
+    if (updates.make !== undefined || updates.model !== undefined || 
+        updates.year !== undefined || updates.location !== undefined) {
       searchName = generateSearchName(
-        args.updates.make ?? existingCar.make,
-        args.updates.model ?? existingCar.model,
-        args.updates.year ?? existingCar.year,
-        args.updates.location ?? existingCar.location
+        updates.make ?? existingCar.make,
+        updates.model ?? existingCar.model,
+        updates.year ?? existingCar.year,
+        updates.location ?? existingCar.location
       );
     }
 
-    await ctx.db.patch(args.carId, {
-      ...args.updates,
+    await ctx.db.patch(carId, {
+      ...updates,
       searchName,
       updatedAt: Date.now(),
     });
@@ -217,14 +239,14 @@ export const updateCar = mutation({
  */
 export const deleteCar = mutation({
   args: { token: v.string(), carId: v.id("cars") },
-  handler: async (ctx: MutationCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token, carId }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user || user.role !== "admin") throw new Error("للأدمن فقط");
 
-    const car = await ctx.db.get(args.carId);
+    const car = await ctx.db.get(carId);
     if (car) {
       // منع الحذف النهائي لضمان بقاء السجلات: نقوم بالأرشفة فقط
-      await ctx.db.patch(args.carId, { isArchived: true, updatedAt: Date.now() });
+      await ctx.db.patch(carId, { isArchived: true, updatedAt: Date.now() });
     }
   },
 });
@@ -234,8 +256,8 @@ export const deleteCar = mutation({
  */
 export const deleteCarById = mutation({
   args: { carId: v.id("cars") },
-  handler: async (ctx: MutationCtx, args) => {
-    await ctx.db.patch(args.carId, { isArchived: true, updatedAt: Date.now() });
+  handler: async (ctx, { carId }) => {
+    await ctx.db.patch(carId, { isArchived: true, updatedAt: Date.now() });
     return "تم نقل السيارة إلى الأرشيف بنجاح.";
   },
 });
@@ -245,8 +267,8 @@ export const deleteCarById = mutation({
  */
 export const clearAllCars = mutation({
   args: { token: v.optional(v.string()) },
-  handler: async (ctx: MutationCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user || user.role !== "admin") throw new Error("صلاحية الأدمن مطلوبة.");
 
     const cars = await ctx.db.query("cars").collect();
@@ -266,11 +288,11 @@ export const getCars = query({
     status: v.optional(v.union(v.literal("Available"), v.literal("Sold"), v.literal("Reserved"))),
     condition: v.optional(v.union(v.literal("New"), v.literal("Used"), v.literal("All"))), // إضافة فلتر جديد
   },
-  handler: async (ctx: QueryCtx, args): Promise<Array<Doc<"cars"> & { mainImageUrl?: string | null; imagesUrls: (string | null)[] }>> => {
+  handler: async (ctx, { includeArchived, status, condition }): Promise<Array<Doc<"cars"> & { mainImageUrl?: string | null; imagesUrls: (string | null)[] }>> => {
     // إذا كان الطلب من واجهة الزوار (includeArchived false)، سنعرض غير المؤرشف + المباع المؤرشف
     let carQuery = ctx.db.query("cars");
     
-    if (!args.includeArchived) {
+    if (!includeArchived) {
       // أظهر السيارات النشطة (غير مؤرشفة) + السيارات المباعة حتى لو تم أرشفتها للعرض التاريخي
       carQuery = carQuery.filter(q => 
         q.or(
@@ -281,15 +303,15 @@ export const getCars = query({
     }
 
     // إذا تم طلب حالة معينة، نطبقها، لكن للزائر نفضل عرض الكل (متاح + مباع) إذا لم يحدد
-    if (args.status) {
-      carQuery = carQuery.filter(q => q.eq(q.field("status"), args.status));
+    if (status) {
+      carQuery = carQuery.filter(q => q.eq(q.field("status"), status));
     }
 
     const cars = await carQuery.order("desc").collect();
 
     // تصفية الحالة (بقيت يدوية لأنها تتطلب منطق Not Equal أحياناً)
-    const finalCars = args.condition === "New" ? cars.filter(c => c.condition === "New") : 
-                     args.condition === "Used" ? cars.filter(c => c.condition !== "New") : cars;
+    const finalCars = condition === "New" ? cars.filter(c => c.condition === "New") : 
+                     condition === "Used" ? cars.filter(c => c.condition !== "New") : cars;
     
     return await Promise.all(
       finalCars.map(async (car) => ({
@@ -315,18 +337,18 @@ export const searchCars = query({
     fuel: v.optional(v.string()),
     transmission: v.optional(v.string()),
   }, 
-  handler: async (ctx: QueryCtx, args) => {
+  handler: async (ctx, { searchTerm, make, status, location, minPrice, maxPrice, fuel, transmission }) => {
     let results: Doc<"cars">[];
-    if (args.searchTerm.length > 0) {
+    if (searchTerm.length > 0) {
       results = await ctx.db
         .query("cars")
         .withSearchIndex("search_cars", (q) => {
-          let search = q.search("searchName", args.searchTerm);
+          let search = q.search("searchName", searchTerm);
           
-          if (args.make) search = search.eq("make", args.make);
+          if (make) search = search.eq("make", make);
           // تعديل: لا نقوم بفرض حالة "Available" افتراضياً، بل نعرض الكل إلا إذا حدد المستخدم الفلتر
-          if (args.status) search = search.eq("status", args.status);
-          if (args.location) search = search.eq("location", args.location);
+          if (status) search = search.eq("status", status);
+          if (location) search = search.eq("location", location);
           return search;
         })
         .collect();
@@ -348,18 +370,18 @@ export const searchCars = query({
         .collect();
 
       // تطبيق فلتر الحالة يدوياً فقط إذا تم إرساله من الواجهة
-      if (args.status) results = results.filter(c => c.status === args.status);
+      if (status) results = results.filter(c => c.status === status);
 
       // تصفية إضافية للموقع والماركة إذا تم اختيارهما
-      if (args.location) results = results.filter(c => c.location === args.location);
-      if (args.make) results = results.filter(c => c.make === args.make);
+      if (location) results = results.filter(c => c.location === location);
+      if (make) results = results.filter(c => c.make === make);
     }
     
     // تطبيق فلاتر المدى والمواصفات يدوياً (لأن Search Index في Convex يدعم فقط المساواة)
-    if (args.minPrice !== undefined) results = results.filter(c => c.price >= args.minPrice!);
-    if (args.maxPrice !== undefined) results = results.filter(c => c.price <= args.maxPrice!);
-    if (args.fuel) results = results.filter(c => c.fuel === args.fuel);
-    if (args.transmission) results = results.filter(c => c.transmission === args.transmission);
+    if (minPrice !== undefined) results = results.filter(c => c.price >= minPrice);
+    if (maxPrice !== undefined) results = results.filter(c => c.price <= maxPrice);
+    if (fuel) results = results.filter(c => c.fuel === fuel);
+    if (transmission) results = results.filter(c => c.transmission === transmission);
 
     return await Promise.all(
       results.map(async (car) => ({
@@ -376,8 +398,8 @@ export const searchCars = query({
  */
 export const getCarById = query({
   args: { carId: v.id("cars") },
-  handler: async (ctx: QueryCtx, args) => {
-    const car = await ctx.db.get(args.carId);
+  handler: async (ctx, { carId }) => {
+    const car = await ctx.db.get(carId);
     if (!car) return null;
     
     return {
@@ -401,7 +423,7 @@ export const generateUploadUrl = mutation(async (ctx) => {
  */
 export const getSellableCars = query({
   args: { token: v.optional(v.string()) },
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     return await ctx.db
       .query("cars")
       .filter((q) =>

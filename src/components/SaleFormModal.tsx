@@ -10,8 +10,8 @@ interface SaleFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialData?: BookingWithDetails | null;
-  preSelectedCarId?: Id<"cars"> | null;
-  setShowConfetti: (show: boolean) => void;
+  preSelectedCarId?: Id<"cars"> | null; // جعل هذا اختياريًا
+  setShowConfetti?: (show: boolean) => void; // جعل هذا اختياريًا
 }
 
 // تعريف نوع الحالة الخاصة بالنموذج
@@ -148,12 +148,12 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId, setShow
         window.open(printUrl, '_blank');
       }
 
-      setShowConfetti(true); // تفعيل الاحتفال في الخلفية
+      setShowConfetti?.(true); // تفعيل الاحتفال في الخلفية (مع التحقق من وجود الدالة)
       toast.success("مبارك! تمت عملية البيع وإصدار الفاتورة بنجاح 🎉", { duration: 5000 });
 
       // إغلاق النافذة فوراً وتنسيق انتهاء الاحتفال بعد 4 ثوانٍ
       onClose();
-      setTimeout(() => { setShowConfetti(false); }, 4000);
+      setTimeout(() => { setShowConfetti?.(false); }, 4000);
 
     } catch (error: unknown) {
       console.error("Error creating sale:", error); // سجل لأي أخطاء تحدث

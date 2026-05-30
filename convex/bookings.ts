@@ -1,4 +1,4 @@
-import { query, mutation, internalMutation, QueryCtx, MutationCtx } from "./_generated/server";
+import { query, mutation, internalMutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthenticatedUser } from "./auth"; // Import getAuthenticatedUser
 
@@ -17,19 +17,28 @@ export const reserveCar = mutation({
     inspectionDate: v.optional(v.number()),
     bookingSource: v.optional(v.union(v.literal("website"), v.literal("whatsapp"), v.literal("phone_call"), v.literal("facebook"))),
   },
-  handler: async (ctx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, {
+    carId,
+    token,
+    guestName,
+    customerPhone,
+    customerLocation,
+    message,
+    inspectionDate,
+    bookingSource
+  }) => {
+    const user = await getAuthenticatedUser(ctx, token);
 
     // 0. التحقق من حالة السيارة: لا يمكن حجز سيارة محجوزة أو مباعة
-    const car = await ctx.db.get(args.carId);
+    const car = await ctx.db.get(carId);
     if (!car || car.status !== "Available") {
       throw new Error("عذراً، هذه السيارة لم تعد متاحة للحجز (محجوزة أو مباعة بالفعل).");
     }
 
     // 1. تأمين البيانات: إذا كان المستخدم مسجلاً، نفضل استخدام بياناته الموثقة
-    const phone = user?.phone || args.customerPhone;
-    const location = user?.address || args.customerLocation;
-    const fullName = user?.fullName || args.guestName || "عميل غير معروف";
+    const phone = user?.phone || customerPhone;
+    const location = user?.address || customerLocation;
+    const fullName = user?.fullName || guestName || "عميل غير معروف";
 
     if (!phone) {
       throw new Error("رقم الهاتف ضروري لإتمام الحجز.");
@@ -49,25 +58,25 @@ export const reserveCar = mutation({
     const reference = `MTX-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     
     const bookingId = await ctx.db.insert("bookings", {
-      carId: args.carId,
+      carId: carId,
       userId: user?._id, 
       bookingDate: now, 
       bookingReference: reference,
-      guestName: user ? undefined : args.guestName, // لا نحتاج لاسم ضيف إذا كان هناك userId
+      guestName: user ? undefined : guestName, // لا نحتاج لاسم ضيف إذا كان هناك userId
       customerPhone: phone,
-      inspectionDate: args.inspectionDate,
+      inspectionDate: inspectionDate,
       customerLocation: location,
-      message: args.message,
+      message: message,
       status: "pending",
       verificationMethod: "phone_call", // الافتراضي في الجزائر
-      bookingSource: args.bookingSource ?? "website",
+      bookingSource: bookingSource ?? "website",
       createdAt: now, // تغيير التاريخ إلى رقم (Timestamp)
       updatedAt: now, // حقل مطلوب في الـ Schema
     });
 
     // جلب تفاصيل السيارة لإنشاء رسالة الإشعار
     const carName = car ? `${car.make} ${car.model}` : "سيارة غير معروفة";
-    const formattedDate = args.inspectionDate ? new Date(args.inspectionDate).toLocaleDateString('ar-DZ') : "لم يحدد";
+    const formattedDate = inspectionDate ? new Date(inspectionDate).toLocaleDateString('ar-DZ') : "لم يحدد";
 
     // نظام الإشعارات العالمي: إرسال تنبيه فوري للإدارة مع رابط مباشر
     await ctx.db.insert("notifications", {
@@ -89,10 +98,10 @@ export const reserveCar = mutation({
  */
 export const getActiveBookingForCar = query({
   args: { carId: v.id("cars") },
-  handler: async (ctx, args) => {
+  handler: async (ctx, { carId }) => {
     const booking = await ctx.db
       .query("bookings")
-      .withIndex("by_car", (q) => q.eq("carId", args.carId))
+      .withIndex("by_car", (q) => q.eq("carId", carId))
       .filter((q) => q.or(q.eq(q.field("status"), "pending"), q.eq(q.field("status"), "confirmed")))
       .first();
 
@@ -108,8 +117,8 @@ export const getActiveBookingForCar = query({
  */
 export const getMyBookings = query({
   args: { token: v.optional(v.string()) },
-  handler: async (ctx: QueryCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user) return [];
 
     // فلترة صارمة: الزبون يرى فقط الحجوزات المرتبطة بمعرفه الرقمي (userId)
@@ -133,8 +142,8 @@ export const getMyBookings = query({
  */
 export const getPendingBookings = query({
   args: { token: v.string() },
-  handler: async (ctx: QueryCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user || (user.role !== "admin" && user.role !== "sales_manager")) {
       throw new Error("غير مصرح لك.");
     }
@@ -160,14 +169,14 @@ export const getPendingBookings = query({
  */
 export const cancelBooking = mutation({
   args: { token: v.string(), bookingId: v.id("bookings") },
-  handler: async (ctx: MutationCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token, bookingId }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user) throw new Error("يجب تسجيل الدخول.");
 
-    const booking = await ctx.db.get(args.bookingId);
+    const booking = await ctx.db.get(bookingId);
     if (!booking) throw new Error("الحجز غير موجود.");
 
-    await ctx.db.patch(args.bookingId, { status: "cancelled", updatedAt: Date.now() });
+    await ctx.db.patch(bookingId, { status: "cancelled", updatedAt: Date.now() });
   },
 });
 
@@ -176,14 +185,14 @@ export const cancelBooking = mutation({
  */
 export const approveBooking = mutation({
   args: { token: v.string(), bookingId: v.id("bookings") },
-  handler: async (ctx: MutationCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token, bookingId }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user || (user.role !== "admin" && user.role !== "sales_manager")) throw new Error("غير مصرح لك.");
 
-    const booking = await ctx.db.get(args.bookingId);
+    const booking = await ctx.db.get(bookingId);
     if (!booking) throw new Error("الحجز غير موجود.");
 
-    await ctx.db.patch(args.bookingId, { status: "confirmed", updatedAt: Date.now() });
+    await ctx.db.patch(bookingId, { status: "confirmed", updatedAt: Date.now() });
 
     const car = await ctx.db.get(booking.carId);
 
@@ -216,17 +225,17 @@ export const approveBooking = mutation({
  */
 export const rejectBooking = mutation({
   args: { token: v.string(), bookingId: v.id("bookings"), reason: v.string() },
-  handler: async (ctx: MutationCtx, args) => {
-    const user = await getAuthenticatedUser(ctx, args.token);
+  handler: async (ctx, { token, bookingId, reason }) => {
+    const user = await getAuthenticatedUser(ctx, token);
     if (!user || (user.role !== "admin" && user.role !== "sales_manager")) throw new Error("غير مصرح لك.");
 
-    await ctx.db.patch(args.bookingId, { 
+    await ctx.db.patch(bookingId, { 
       status: "rejected", 
-      rejectionReason: args.reason,
+      rejectionReason: reason,
       updatedAt: Date.now() 
     });
 
-    const booking = await ctx.db.get(args.bookingId);
+    const booking = await ctx.db.get(bookingId);
 
     if (booking) {
       // إرسال إشعار الرفض للزبون فقط إذا كان يملك حساباً
@@ -234,7 +243,7 @@ export const rejectBooking = mutation({
         await ctx.db.insert("notifications", {
           userId: booking.userId,
           title: "تحديث بخصوص حجزك ⚠️",
-          message: `نعتذر منك، تم رفض طلب الحجز للسبب التالي: ${args.reason}`,
+          message: `نعتذر منك، تم رفض طلب الحجز للسبب التالي: ${reason}`,
           type: "warning",
           priority: "medium",
           isRead: false,

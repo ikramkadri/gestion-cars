@@ -316,7 +316,7 @@ const InventoryPage = () => {
           setIsSaleModalOpen(false);
           setSelectedCarIdForSale(null);
         }} 
-        setShowConfetti={setShowConfetti} // تمرير دالة التحكم في القصاصات
+        setShowConfetti={setShowConfetti} // تمرير دالة التحكم في القصاصات (الآن هي اختيارية في المكون)
         preSelectedCarId={selectedCarIdForSale}
       />
 

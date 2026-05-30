@@ -12,6 +12,13 @@ interface InvoiceClassicProps {
   sale: SaleWithDetails | null;
 }
 
+// تعريف واجهة بسيطة للمكتبة لتجنب استخدام any
+interface Html2PdfInstance {
+  from(element: HTMLElement): Html2PdfInstance;
+  set(options: object): Html2PdfInstance;
+  save(): Promise<void>;
+}
+
 const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -48,10 +55,11 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
     if (!element) return;
 
     setIsGenerating(true);
-    let html2pdf;
+    let html2pdf: ((element?: HTMLElement) => Html2PdfInstance) | undefined;
+    
     try {
-      // @ts-expect-error
-      html2pdf = (await import('html2pdf.js')).default;
+      const module = await import('html2pdf.js');
+      html2pdf = module.default;
     } catch {
       setIsGenerating(false);
       toast.error("يرجى تثبيت المكتبة أولاً: npm install html2pdf.js");
@@ -70,7 +78,7 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
         // إضافة هذه الخاصية لحل مشاكل تحميل الموارد في بعض المتصفحات
         enableLinks: true
       };
-      await html2pdf().from(element).set(opt).save();
+      if (html2pdf) await html2pdf().from(element).set(opt).save();
       toast.success("تم الحفظ بنجاح", { id: toastId });
     } catch {
       toast.error("حدث خطأ أثناء التحميل", { id: toastId });

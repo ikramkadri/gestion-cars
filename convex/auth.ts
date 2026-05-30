@@ -1,4 +1,5 @@
-import { mutation, query, action, internalMutation, internalQuery, MutationCtx, QueryCtx } from "./_generated/server";
+import { mutation, query, action, internalMutation, internalQuery } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";

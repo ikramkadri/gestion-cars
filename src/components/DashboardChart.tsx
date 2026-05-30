@@ -82,11 +82,12 @@ const DashboardChart = () => {
                 fontSize: '12px'
               }}
               itemStyle={{ color: '#3b82f6' }}
-              formatter={(value: number | string | undefined) => {
-                if (value === undefined) {
+              formatter={(value: string | number | readonly (string | number)[] | undefined) => {
+                if (value === undefined || value === null) {
                   return ['N/A', "الإيرادات"];
                 }
-                return [`${Number(value).toLocaleString()} دج`, "الإيرادات"];
+                const displayValue = Array.isArray(value) ? value[0] : value;
+                return [`${Number(displayValue).toLocaleString()} دج`, "الإيرادات"];
               }}
               labelStyle={{ marginBottom: '4px', color: '#94a3b8' }}
             />
