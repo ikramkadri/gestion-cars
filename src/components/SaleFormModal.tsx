@@ -79,12 +79,14 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId, setShow
     }
 
     // إذا تم تحميل السيارات، نقوم بتعبئة البيانات بناءً على السيارة المختارة
-    if (preSelectedCarId && allCars !== undefined && initializedRef.current !== preSelectedCarId) {
+    const shouldInitialize = preSelectedCarId && allCars !== undefined && initializedRef.current !== preSelectedCarId;
+    
+    if (shouldInitialize) {
       const car = allCars.find(c => c._id === preSelectedCarId);
       if (car) {
         setFormData(prev => ({
           ...prev,
-          carId: preSelectedCarId,
+          carId: preSelectedCarId as string,
           customerName: activeBooking?.clientDetails?.fullName || activeBooking?.guestName || prev.customerName,
           phone: activeBooking?.customerPhone || activeBooking?.clientDetails?.phone || prev.phone,
           address: activeBooking?.customerLocation || activeBooking?.clientDetails?.address || prev.address,
@@ -101,9 +103,7 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId, setShow
     preSelectedCarId, 
     allCars, 
     activeBooking, 
-    formData.carId, 
-    formData.customerName
-  ]); // Dependencies updated to include used form fields
+  ]); 
 
   const handleCarSelection = (carId: Id<"cars">) => {
     const car = allCars?.find(c => c._id === carId);

@@ -43,6 +43,16 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
 
   if (!isOpen) return null;
 
+  const handlePrintDirectly = () => {
+    // اختبار سريع كما اقترحتِ للتأكد من وجود العنصر في الـ DOM
+    console.log("Printable Element Found:", document.getElementById("printable-invoice"));
+    
+    // استخدام setTimeout لضمان استقرار المحتوى قبل فتح نافذة الطباعة
+    setTimeout(() => {
+      window.print();
+    }, 500);
+  };
+
   const handleDownloadPDF = async () => {
     const element = document.getElementById('printable-invoice');
     if (!element) return;
@@ -50,9 +60,9 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
     setIsGenerating(true);
     let html2pdf;
     try {
-      // @ts-ignore
+      // @ts-expect-error - html2pdf might not be typed
       html2pdf = (await import('html2pdf.js')).default;
-    } catch (e) {
+    } catch {
       setIsGenerating(false);
       toast.error("يرجى تثبيت المكتبة أولاً: npm install html2pdf.js");
       return;
@@ -174,7 +184,7 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
 
         {/* Actions */}
         <div className="p-8 bg-slate-50 border-t flex justify-center gap-4 print:hidden">
-          <button onClick={() => window.print()} className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl active:scale-95">
+          <button onClick={handlePrintDirectly} className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-xl active:scale-95">
             <Printer size={20}/> طباعة
           </button>
           <button disabled={isGenerating} onClick={handleDownloadPDF} className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-black flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl disabled:opacity-50 active:scale-95">
@@ -187,23 +197,47 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page { margin: 10mm; size: a4; }
-          /* إخفاء كل شيء في الموقع */
+          
+          body { background: white !important; }
+
+          /* إخفاء المحتوى العام للموقع */
           body * { visibility: hidden; }
-          /* إظهار حاوية الفاتورة ومحتوياتها فقط */
-          #printable-invoice, #printable-invoice * { 
-            visibility: visible; 
+          
+          /* إظهار حاوية الفاتورة والـ Modal الأب فقط لضمان التسلسل */
+          .fixed.inset-0, .fixed.inset-0 *, #printable-invoice, #printable-invoice * { 
+            visibility: visible !important; 
           }
+
           #printable-invoice {
-            position: absolute; 
-            left: 0; 
-            top: 0; 
-            width: 100%;
+            display: block !important;
+            position: relative !important;
+            width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
           }
-          .print\\:hidden, button, .backdrop-blur-md, [role="dialog"] > div:first-child { 
+
+          /* إخفاء الأزرار وعناصر التحكم */
+          .print\\:hidden, button { 
             display: none !important; 
           }
+
+          /* معالجة الحاوية الرئيسية للـ Modal (تحويلها من fixed إلى static) */
+          .fixed.inset-0 { 
+            position: static !important; 
+            background: transparent !important; 
+            backdrop-filter: none !important; 
+            display: block !important;
+            padding: 0 !important;
+            z-index: auto !important;
+          }
+
+          .bg-white.rounded-\\[2\\.5rem\\] {
+            border: none !important;
+            box-shadow: none !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+          }
+
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}} />

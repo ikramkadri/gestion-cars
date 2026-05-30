@@ -12,8 +12,8 @@ interface Review {
 }
 
 const TestimonialsSection = () => {
-  const { lang } = useLang();
-  const reviews = useQuery(api.reviews.getLatestReviews);
+  const { language: lang } = useLang();
+  const reviews = useQuery((api as any).reviews.getLatestReviews) as Review[] | undefined;
 
   const goldColor = '#D4AF37';
 
@@ -68,7 +68,7 @@ const TestimonialsSection = () => {
 
         {/* السلايدر الأفقي (Horizontal Scroll) */}
         <div className="flex gap-8 overflow-x-auto pb-12 custom-scrollbar snap-x snap-mandatory px-4 scroll-smooth">
-          {reviews.map((review, i) => (
+          {reviews.map((review: Review, i: number) => (
             <motion.div
               key={review._id}
               initial={{ opacity: 0, x: 50 }}

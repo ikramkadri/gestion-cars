@@ -1,6 +1,6 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Car, DollarSign, TrendingUp, Activity, Package, CheckCircle2, LayoutGrid, Users, BookOpen, Wallet, ShieldCheck, ArrowUpRight } from 'lucide-react';
+import { Car, DollarSign, TrendingUp, Activity, Package, CheckCircle2, LayoutGrid, Users, BookOpen, Wallet } from 'lucide-react';
 import { SaleWithDetails } from '../types/app';
 import DashboardChart from '../components/DashboardChart';
 import { Doc } from '../../convex/_generated/dataModel';
