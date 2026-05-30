@@ -10,6 +10,7 @@ import { Id } from '../../convex/_generated/dataModel';
 import { api } from '../../convex/_generated/api';
 import { CarType } from '../features/cars/types/car.types'; // Import CarType
 import { toast } from 'react-hot-toast';
+import { useLang } from '../lib/LanguageContext';
 import TypewriterText from './TypewriterText'; // Import the extracted component
 import LoanCalculator from './LoanCalculator'; // LoanCalculator is already typed
 
@@ -37,6 +38,27 @@ interface CarCardProps {
 
 const CarCard = ({ car, showRemoveButton }: CarCardProps) => {
   const navigate = useNavigate();
+  const { language: lang } = useLang();
+
+  // قاموس ترجمة بسيط لحالات السيارة
+  const statusTranslations = {
+    ar: {
+      available: "متاح حالياً",
+      sold: "تم البيع - SOLD",
+      reserved: "محجوزة"
+    },
+    fr: {
+      available: "Disponible",
+      sold: "VENDU",
+      reserved: "Réservé"
+    },
+    en: {
+      available: "Available",
+      sold: "SOLD",
+      reserved: "Reserved"
+    }
+  };
+  const st = statusTranslations[lang as 'ar' | 'fr' | 'en'] || statusTranslations.ar;
 
   // دمج منطق الصور ليدعم الروابط المباشرة (القديمة) وروابط التخزين (الجديدة)
   // تم تعديل هذا الجزء لضمان أن مصفوفة الصور تحتوي على روابط صالحة فقط (string)
@@ -137,7 +159,7 @@ const CarCard = ({ car, showRemoveButton }: CarCardProps) => {
               <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-[1px]" />
               <div className="relative rotate-[-12deg] border-2 border-white/90 px-4 py-1 rounded-lg shadow-2xl animate-in zoom-in duration-500 bg-slate-900/40">
                 <span className="text-white text-xl font-black uppercase tracking-tighter drop-shadow-lg">
-                  مباعة - SOLD
+                  {st.sold}
                 </span>
               </div>
             </div>
@@ -149,7 +171,7 @@ const CarCard = ({ car, showRemoveButton }: CarCardProps) => {
               <div className="absolute inset-0 bg-amber-900/10 backdrop-blur-[0.5px]" />
               <div className="relative rotate-[-12deg] border-2 border-amber-400 px-4 py-1 rounded-lg shadow-2xl animate-in zoom-in duration-500 bg-amber-500/20">
                 <span className="text-amber-400 text-xl font-black uppercase tracking-tighter drop-shadow-lg">
-                  محجوزة - RESERVED
+                  {st.reserved}
                 </span>
               </div>
             </div>
@@ -197,9 +219,9 @@ const CarCard = ({ car, showRemoveButton }: CarCardProps) => {
               <div className={`w-2.5 h-2.5 rounded-full animate-pulse ${
                 car.status === "Available" ? 'bg-emerald-500' : car.status === "Sold" ? 'bg-rose-500' : 'bg-white'
               }`} />
-              {car.status === "Available" ? "متاح حالياً" : 
-               car.status === "Sold" ? "تم البيع - SOLD" : 
-               "محجوزة"}
+              {car.status === "Available" ? st.available : 
+               car.status === "Sold" ? st.sold : 
+               st.reserved}
             </span>
           </div>
 

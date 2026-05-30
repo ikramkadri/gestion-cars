@@ -20,25 +20,36 @@ import { Id } from "../../convex/_generated/dataModel";
 import { CarType } from '../features/cars/types/car.types';
 import StatsCard from '../components/StatsCard'; // استيراد مكون بطاقة الإحصائيات الموحد
 import SaleFormModal from '../components/SaleFormModal';
-import { 
-  
- } from '../types/app';
+import Confetti from 'react-confetti'; // استيراد مكون القصاصات
+import { useWindowSize } from 'react-use'; // استيراد هوك لمعرفة أبعاد النافذة
+import { useLang } from '../lib/LanguageContext';
 
 const InventoryPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [carConditionFilter, setCarConditionFilter] = useState<"All" | "New" | "Used">("All");
+  const { language: lang } = useLang();
+  
+  const statusLabels = {
+    ar: { available: "متاح للبيع", reserved: "محجوزة حالياً", sold: "تم البيع" },
+    fr: { available: "Disponible", reserved: "Réservé", sold: "Vendu" },
+    en: { available: "Available", reserved: "Reserved", sold: "Sold" }
+  };
+  const sl = statusLabels[lang as 'ar' | 'fr' | 'en'] || statusLabels.ar;
+
   const navigate = useNavigate();
   
   const token = localStorage.getItem("convex_token") ?? undefined;
   const user = useQuery(api.users.viewer, { token });
 
   // جلب البيانات من الباك اند (Convex)
-  const cars = useQuery(api.cars.getCars, { includeArchived: false, condition: carConditionFilter });
+  const cars = useQuery(api.cars.getCars, token ? { includeArchived: false, condition: carConditionFilter } : "skip"); 
   const stats = useQuery(api.statistics.getDashboardStats, { token });
   const updateCar = useMutation(api.cars.updateCar);
   const removeCar = useMutation(api.cars.deleteCar);
 
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false); // حالة جديدة للتحكم في القصاصات
+  const { width, height } = useWindowSize(); // للحصول على أبعاد الشاشة للقصاصات
   const [selectedCarIdForSale, setSelectedCarIdForSale] = useState<Id<"cars"> | null>(null);
 
   const filteredCars: CarType[] = (cars as CarType[] || [])?.filter((car: CarType) => 
@@ -150,7 +161,7 @@ const InventoryPage = () => {
         <StatsCard 
           icon={Car} 
           bg="bg-slate-900" 
-          color="bg-slate-900"
+          color="text-white"
           label="إجمالي الأسطول" 
           val={stats?.inventory.total.toString() ?? "..."}
           unit="سيارة"
@@ -158,7 +169,7 @@ const InventoryPage = () => {
         <StatsCard 
           icon={CheckCircle2} 
           bg="bg-emerald-500" 
-          color="bg-emerald-500"
+          color="text-white"
           label="متوفر للبيع" 
           val={stats?.inventory.available.toString() ?? "..."} 
           unit="سيارة"
@@ -166,7 +177,7 @@ const InventoryPage = () => {
         <StatsCard 
           icon={DollarSign} 
           bg="bg-blue-600" 
-          color="bg-blue-600"
+          color="text-white"
           label="قيمة المخزون الكلية" 
           val={stats ? (stats.financials.stockValue / 1000000).toFixed(1) : "..."} 
           unit="M د.ج"
@@ -174,7 +185,7 @@ const InventoryPage = () => {
         <StatsCard 
           icon={Clock} 
           bg="bg-amber-500" 
-          color="bg-amber-500"
+          color="text-white"
           label="قيد الانتظار" 
           val={stats?.inventory.reserved.toString() ?? "..."} 
           unit="سيارة"
@@ -240,7 +251,7 @@ const InventoryPage = () => {
                       ? 'bg-amber-100 text-amber-700 border border-amber-200'
                       : 'bg-rose-50 text-rose-600 border border-rose-100'
                     }`}>
-                      {car.status === "Available" ? "متاح للبيع" : car.status === "Reserved" ? "محجوزة حالياً" : "تم البيع"}
+                      {car.status === "Available" ? sl.available : car.status === "Reserved" ? sl.reserved : sl.sold}
                     </span>
                   </td>
                   {user?.role !== "viewer" && (
@@ -305,8 +316,21 @@ const InventoryPage = () => {
           setIsSaleModalOpen(false);
           setSelectedCarIdForSale(null);
         }} 
+        setShowConfetti={setShowConfetti} // تمرير دالة التحكم في القصاصات
         preSelectedCarId={selectedCarIdForSale}
       />
+
+      {/* تأثير القصاصات الملونة عند النجاح (يظهر في الخلفية) */}
+      {showConfetti && (
+        <Confetti
+          width={width}
+          height={height}
+          numberOfPieces={300}
+          recycle={false}
+          gravity={0.2}
+          style={{ zIndex: 5000, position: 'fixed', top: 0, left: 0 }} // رفع الـ zIndex فوق كل شيء
+        />
+      )}
     </div>
   );
 };

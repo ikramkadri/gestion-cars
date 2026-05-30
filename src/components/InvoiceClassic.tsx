@@ -48,7 +48,16 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
     if (!element) return;
 
     setIsGenerating(true);
-    const html2pdf = (await import('html2pdf.js')).default; // Dynamic import here
+    let html2pdf;
+    try {
+      // @ts-ignore
+      html2pdf = (await import('html2pdf.js')).default;
+    } catch (e) {
+      setIsGenerating(false);
+      toast.error("يرجى تثبيت المكتبة أولاً: npm install html2pdf.js");
+      return;
+    }
+
     const toastId = toast.loading("جاري تجهيز ملف PDF...");
 
     try {
@@ -57,7 +66,9 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
         filename: `Invoice-${defaultSale.invoiceNumber}.pdf`,
         image: { type: 'jpeg' as const, quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
+        // إضافة هذه الخاصية لحل مشاكل تحميل الموارد في بعض المتصفحات
+        enableLinks: true
       };
       await html2pdf().from(element).set(opt).save();
       toast.success("تم الحفظ بنجاح", { id: toastId });
@@ -81,7 +92,7 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
           <div className="flex justify-between items-center mb-12 border-b-4 border-slate-900 pb-8">
             <div className="flex flex-col items-start">
                <div className="flex items-center gap-3 mb-2">
-                  {logoImageUrl ? (
+                  {logoImageUrl && logoImageUrl !== "" ? (
                     <img src={logoImageUrl} alt="Logo" className="w-16 h-16 object-contain" />
                   ) : (
                     <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center text-white">
@@ -175,16 +186,25 @@ const InvoiceClassic = ({ isOpen, onClose, sale }: InvoiceClassicProps) => {
 
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
+          @page { margin: 10mm; size: a4; }
+          /* إخفاء كل شيء في الموقع */
           body * { visibility: hidden; }
-          #printable-invoice, #printable-invoice * { visibility: visible; }
-          #printable-invoice { 
+          /* إظهار حاوية الفاتورة ومحتوياتها فقط */
+          #printable-invoice, #printable-invoice * { 
+            visibility: visible; 
+          }
+          #printable-invoice {
             position: absolute; 
             left: 0; 
             top: 0; 
             width: 100%;
             padding: 0 !important;
+            margin: 0 !important;
           }
-          .print\\:hidden { display: none !important; }
+          .print\\:hidden, button, .backdrop-blur-md, [role="dialog"] > div:first-child { 
+            display: none !important; 
+          }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
       `}} />
     </div>

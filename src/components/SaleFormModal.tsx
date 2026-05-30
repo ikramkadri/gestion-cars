@@ -1,11 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
 import { X, User, Phone, DollarSign, CreditCard, Car, Loader2, MapPin, Hash, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import Confetti from 'react-confetti';
-import { useWindowSize } from 'react-use';
 import { BookingWithDetails } from '../types/app'; // استخدام النوع من الملف الموحد
 
 interface SaleFormModalProps {
@@ -13,6 +11,7 @@ interface SaleFormModalProps {
   onClose: () => void;
   initialData?: BookingWithDetails | null;
   preSelectedCarId?: Id<"cars"> | null;
+  setShowConfetti: (show: boolean) => void;
 }
 
 // تعريف نوع الحالة الخاصة بالنموذج
@@ -27,9 +26,8 @@ interface SaleFormData {
   paymentMethod: "Cash" | "Bank Transfer" | "Check" | "Card";
 }
 
-const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId }: SaleFormModalProps) => {
+const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId, setShowConfetti }: SaleFormModalProps) => {
   const token = localStorage.getItem("convex_token") || "";
-  const { width, height } = useWindowSize();
   
   // جلب السيارات (المتاحة والمحجوزة) القابلة للبيع
   const allCars = useQuery(api.cars.getCars, { includeArchived: false });
@@ -39,7 +37,7 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId }: SaleF
   const activeBooking = useQuery(api.bookings.getActiveBookingForCar, preSelectedCarId ? { carId: preSelectedCarId } : "skip");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
+  const initializedRef = useRef<Id<"cars"> | null>(null); // لتتبع ما إذا كانت بيانات السيارة المحددة مسبقاً قد تم تهيئتها
 
   const [formData, setFormData] = useState<SaleFormData>(() => {
     if (initialData) {
@@ -80,24 +78,26 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId }: SaleF
       return;
     }
 
-    if (preSelectedCarId && allCars !== undefined && activeBooking !== undefined) {
+    // إذا تم تحميل السيارات، نقوم بتعبئة البيانات بناءً على السيارة المختارة
+    if (preSelectedCarId && allCars !== undefined && initializedRef.current !== preSelectedCarId) {
       const car = allCars.find(c => c._id === preSelectedCarId);
-      
-      if (car && (formData.carId !== preSelectedCarId || formData.customerName === '')) {
+      if (car) {
         setFormData(prev => ({
           ...prev,
           carId: preSelectedCarId,
-          customerName: activeBooking?.clientDetails?.fullName || activeBooking?.guestName || '',
-          phone: activeBooking?.customerPhone || activeBooking?.clientDetails?.phone || '',
-          address: activeBooking?.customerLocation || activeBooking?.clientDetails?.address || '',
-          amountPaid: car?.price || prev.amountPaid,
-          vin: car?.vin || '',
+          customerName: activeBooking?.clientDetails?.fullName || activeBooking?.guestName || prev.customerName,
+          phone: activeBooking?.customerPhone || activeBooking?.clientDetails?.phone || prev.phone,
+          address: activeBooking?.customerLocation || activeBooking?.clientDetails?.address || prev.address,
+          amountPaid: car.price || prev.amountPaid,
+          vin: car.vin || prev.vin || '',
         }));
+        initializedRef.current = preSelectedCarId;
       }
+    } else if (!preSelectedCarId) {
+      initializedRef.current = null;
     }
   }, [
     isOpen, 
-    initialData, 
     preSelectedCarId, 
     allCars, 
     activeBooking, 
@@ -142,19 +142,22 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId }: SaleF
         token,
       });
 
+      console.log("Sale created with ID:", saleId); // سجل لتأكيد معرف عملية البيع
       // ميزة الطباعة التلقائية: فتح الفاتورة في نافذة جديدة مهيأة للطباعة فوراً
       if (saleId) {
         const printUrl = `/admin/invoice/${saleId}?print=true`;
         window.open(printUrl, '_blank');
       }
 
-      setShowConfetti(true);
+      setShowConfetti(true); // تفعيل الاحتفال في الخلفية
       toast.success("مبارك! تمت عملية البيع وإصدار الفاتورة بنجاح 🎉", { duration: 5000 });
 
-      // إغلاق النافذة فوراً للسماح للموظف بمتابعة العمل، مع ترك الاحتفال يظهر
-      setTimeout(() => { onClose(); setShowConfetti(false); }, 4000);
+      // إغلاق النافذة فوراً وتنسيق انتهاء الاحتفال بعد 4 ثوانٍ
+      onClose();
+      setTimeout(() => { setShowConfetti(false); }, 4000);
 
     } catch (error: unknown) {
+      console.error("Error creating sale:", error); // سجل لأي أخطاء تحدث
       setIsSubmitting(false);
       const errorMessage = error instanceof Error ? error.message : "حدث خطأ أثناء تسجيل البيع";
       toast.error(errorMessage);
@@ -169,18 +172,6 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId }: SaleF
 
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[1000] flex items-center justify-center p-4">
-      {/* تأثير القصاصات الملونة عند النجاح */}
-      {showConfetti && (
-        <Confetti
-          width={width}
-          height={height}
-          numberOfPieces={300}
-          recycle={false}
-          gravity={0.2}
-          style={{ zIndex: 2000 }}
-        />
-      )}
-
       <div className="bg-white w-full max-w-2xl max-h-[95vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200" dir="rtl">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-700 to-indigo-900 p-6 text-white flex justify-between items-center border-b-4 border-[#D4AF37] shrink-0">
@@ -228,13 +219,14 @@ const SaleFormModal = ({ isOpen, onClose, initialData, preSelectedCarId }: SaleF
 
             {/* رقم الهيكل (VIN) - إدخال وتأكيد */}
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-400 uppercase mr-1 flex items-center gap-1">
-                <Hash size={14} className="text-indigo-500" /> رقم الهيكل (VIN)
+              <label className="text-xs font-black text-blue-600 uppercase mr-1 flex items-center gap-1">
+                <Hash size={14} /> الرقم التسلسلي للمركبة (VIN) *
               </label>
               <input 
                 type="text"
-                placeholder="الرقم التسلسلي للمركبة..."
-                className={`w-full p-4 rounded-2xl font-mono text-sm outline-none focus:ring-2 focus:ring-indigo-500 transition-all ${getAutoFilledClass(formData.vin)}`}
+                required
+                placeholder="إجباري لإتمام الفاتورة..."
+                className={`w-full p-4 rounded-2xl font-mono text-base border-2 outline-none focus:ring-4 focus:ring-blue-500/10 transition-all ${getAutoFilledClass(formData.vin)}`}
                 value={formData.vin}
                 onChange={(e) => setFormData({...formData, vin: e.target.value})}
               />
