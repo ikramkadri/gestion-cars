@@ -774,8 +774,18 @@ export const useLang = () => {
 export const useLanguage = useLang;
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>('ar');
-  const [theme, setTheme] = useState<Theme>('light');
+  const [language, setLanguage] = useState<Language>(() => {
+    const saved = localStorage.getItem('app_language');
+    if (saved === 'ar' || saved === 'fr' || saved === 'en') return saved;
+    return 'ar';
+  });
+  const [theme, setTheme] = useState<Theme>(() => {
+    const saved = localStorage.getItem('app_theme');
+    if (saved === 'light' || saved === 'dark') return saved;
+    // Respect system preference
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+    return 'light';
+  });
 
   const isRtl = language === 'ar';
 
@@ -791,14 +801,23 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return result;
   };
 
-  const setLang = (l: Language) => setLanguage(l);
-  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  const setLang = (l: Language) => {
+    setLanguage(l);
+    localStorage.setItem('app_language', l);
+  };
+
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      localStorage.setItem('app_theme', next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     document.dir = isRtl ? 'rtl' : 'ltr';
     document.documentElement.className = theme;
   }, [language, theme, isRtl]);
-
   return (
     <LanguageContext.Provider value={{ language, setLang, theme, toggleTheme, t, isRtl }}>
       {children}
