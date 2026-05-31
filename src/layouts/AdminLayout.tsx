@@ -6,11 +6,12 @@ import { api } from '../../convex/_generated/api';
 import Sidebar from '../components/Sidebar';
 import LoadingScreen from '../components/LoadingScreen';
 import { Menu, X } from 'lucide-react';
-
+import { useLanguage } from '../lib/LanguageContext';
 const AdminLayout = ({ children }: { children?: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { isRtl } = useLanguage();
   const token = localStorage.getItem("convex_token") ?? undefined;
-  const user = useQuery(api.users.viewer, token ? { token } : "skip"); // Pass token only if it exists, otherwise skip
+  const user = useQuery(api.users.viewer, token ? { token } : "skip");
   const customSignOut = useMutation(api.auth.signOut);
 
   if (user === undefined) {
@@ -25,16 +26,16 @@ const AdminLayout = ({ children }: { children?: React.ReactNode }) => {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F8F9FD] relative" dir="rtl">
-      {/* زر القائمة للهواتف */}
+    <div className="flex min-h-screen bg-background relative transition-colors duration-300" dir={isRtl ? 'rtl' : 'ltr'}>
+      {/* Mobile Menu Button */}
       <button 
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="lg:hidden fixed top-4 right-4 z-[110] p-3 bg-white rounded-2xl shadow-lg text-indigo-600"
+        className={`lg:hidden fixed top-4 ${isRtl ? 'right-4' : 'left-4'} z-[110] p-3 bg-card rounded-2xl shadow-lg text-indigo-600 border border-border`}
       >
         {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
-      {/* Overlay للهواتف */}
+      {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div 
           className="lg:hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[90]" 
@@ -43,17 +44,16 @@ const AdminLayout = ({ children }: { children?: React.ReactNode }) => {
       )}
 
       <div className={`
-        fixed lg:static inset-y-0 right-0 z-[100] transform transition-transform duration-300
-        ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+        fixed lg:static inset-y-0 ${isRtl ? 'right-0' : 'left-0'} z-[100] transform transition-transform duration-300
+        ${isSidebarOpen ? 'translate-x-0' : isRtl ? 'translate-x-full lg:translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         <Sidebar 
           user={user ? { ...user, imageUrl: user.imageUrl ?? undefined } : user} 
           onSignOut={handleSignOut} 
         />
       </div>
-
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 lg:pr-8 overflow-y-auto w-full">
+      <main className={`flex-1 p-4 md:p-8 ${isRtl ? 'lg:pr-8' : 'lg:pl-8'} overflow-y-auto w-full`}>
         {children || <Outlet />}
       </main>
     </div>

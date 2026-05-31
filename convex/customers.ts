@@ -30,6 +30,53 @@ export const listCustomers = query({
   },
 });
 
+export const createCustomer = mutation({
+  args: {
+    token: v.string(),
+    fullName: v.string(),
+    phone: v.string(),
+    email: v.optional(v.string()),
+    address: v.optional(v.string()),
+    identityNum: v.optional(v.string()),
+    status: v.optional(v.string()),
+    totalPurchases: v.optional(v.number()),
+  },
+  handler: async (ctx: MutationCtx, args) => {
+    const user = await getAuthenticatedUser(ctx, args.token);
+    if (!user || (user.role !== "admin" && user.role !== "sales_manager")) {
+      throw new Error("غير مصرح لك بإضافة الزبائن.");
+    }
+
+    const { token, ...customerData } = args;
+    const now = Date.now();
+
+    const existing = await ctx.db
+      .query("customers")
+      .withIndex("by_phone", (q) => q.eq("phone", args.phone))
+      .unique();
+    if (existing) {
+      throw new Error("يوجد زبون مسجل برقم الهاتف هذا بالفعل.");
+    }
+
+    const customerId = await ctx.db.insert("customers", {
+      ...customerData,
+      status: args.status || "خالص",
+      totalPurchases: args.totalPurchases || 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("activity_logs", {
+      action: "CUSTOMER_CREATED",
+      details: `تم إضافة الزبون الجديد ${args.fullName}`,
+      userId: user._id,
+      createdAt: now,
+    });
+
+    return customerId;
+  },
+});
+
 export const updateCustomer = mutation({
   args: {
     token: v.string(),

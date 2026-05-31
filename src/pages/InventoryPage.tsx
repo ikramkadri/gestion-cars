@@ -23,19 +23,16 @@ import SaleFormModal from '../components/SaleFormModal';
 import Confetti from 'react-confetti'; // استيراد مكون القصاصات
 import { useWindowSize } from 'react-use'; // استيراد هوك لمعرفة أبعاد النافذة
 import { useLang } from '../lib/LanguageContext';
-
 const InventoryPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [carConditionFilter, setCarConditionFilter] = useState<"All" | "New" | "Used">("All");
-  const { language: lang } = useLang();
-  
+  const { t, language, isRtl } = useLang();
   const statusLabels = {
     ar: { available: "متاح للبيع", reserved: "محجوزة حالياً", sold: "تم البيع" },
     fr: { available: "Disponible", reserved: "Réservé", sold: "Vendu" },
     en: { available: "Available", reserved: "Reserved", sold: "Sold" }
   };
-  const sl = statusLabels[lang as 'ar' | 'fr' | 'en'] || statusLabels.ar;
-
+  const sl = statusLabels[language as 'ar' | 'fr' | 'en'] || statusLabels.ar;
   const navigate = useNavigate();
   
   const token = localStorage.getItem("convex_token") ?? undefined;
@@ -58,22 +55,22 @@ const InventoryPage = () => {
   ) || [];
 
   const handleDelete = async (id: Id<"cars">) => {
-    if (window.confirm("هل أنت متأكد من حذف هذه السيارة؟")) {
-      const toastId = toast.loading("جاري حذف السيارة وصورها...");
+    if (window.confirm(t('inventory_delete_confirm'))) {
+      const toastId = toast.loading(t('inventory_delete_loading'));
       try {
         const token = localStorage.getItem("convex_token") || "";
-        await removeCar({ carId: id, token: token }); // Ensure token is passed
-        toast.success("تم حذف السيارة بنجاح", { id: toastId });
+        await removeCar({ carId: id, token: token });
+        toast.success(t('inventory_delete_success'), { id: toastId });
       } catch (error: unknown) {
         console.error("Delete error:", error);
-        toast.error("فشل حذف السيارة، يرجى المحاولة لاحقاً", { id: toastId });
+        toast.error(t('inventory_delete_error'), { id: toastId });
       }
     }
   };
 
   const handleResetStatus = async (id: Id<"cars">, name: string) => {
-    if (window.confirm(`هل تريد إعادة السيارة "${name}" للحالة "متاحة للبيع"؟`)) {
-      const toastId = toast.loading("جاري تحديث الحالة...");
+    if (window.confirm(t('inventory_status_restore_confirm').replace('{name}', name))) {
+      const toastId = toast.loading(t('inventory_status_restore_loading'));
       try {
         const token = localStorage.getItem("convex_token") || "";
         await updateCar({ 
@@ -81,9 +78,9 @@ const InventoryPage = () => {
           carId: id, 
           updates: { status: "Available", isArchived: false } 
         });
-        toast.success("السيارة عادت للسوق بنجاح ✅", { id: toastId });
+        toast.success(t('inventory_status_restore_success'), { id: toastId });
       } catch {
-        toast.error("فشل التحديث", { id: toastId });
+        toast.error(t('inventory_status_restore_error'), { id: toastId });
       }
     }
   };
@@ -94,27 +91,26 @@ const InventoryPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FD] p-4 md:p-8 font-sans text-right" dir="rtl">
+    <div className={`min-h-screen bg-slate-50 dark:bg-background font-sans ${isRtl ? 'text-right' : 'text-left'} transition-colors duration-300`} dir={isRtl ? 'rtl' : 'ltr'}>
       {/* العنوان والبحث */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
         <div>
-          <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider mb-3">
-            <Package size={14} /> نظام تتبع الأسطول الذكي
+          <div className="inline-flex items-center gap-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider mb-3">
+            <Package size={14} /> {t('inventory_subtitle')}
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight">
-            إدارة <span className="text-indigo-600">المخزون</span>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white leading-tight">
+            {t('inventory_title').split(' ')[0]} <span className="text-indigo-600">{t('inventory_title').split(' ').slice(1).join(' ')}</span>
           </h1>
         </div>
-        
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative group">
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+            <Search className={`absolute ${isRtl ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-slate-300`} size={18} />
             <input 
               type="text"
-              placeholder="ابحث بالماركة أو الموديل..."
+              placeholder={t('inventory_search_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-white border border-slate-200 pr-11 pl-4 py-3 rounded-2xl w-full md:w-72 focus:ring-2 focus:ring-indigo-500/10 outline-none font-bold text-slate-700 transition-all shadow-sm text-right"
+              className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 ${isRtl ? 'pr-11 pl-4 text-right' : 'pl-11 pr-4 text-left'} py-3 rounded-2xl w-full md:w-72 focus:ring-2 focus:ring-indigo-500/10 dark:focus:ring-blue-500/20 outline-none font-bold text-slate-700 dark:text-slate-200 transition-all shadow-sm`}
             />
           </div>
           {user?.role !== "viewer" && (
@@ -122,96 +118,93 @@ const InventoryPage = () => {
               onClick={() => navigate("/admin/inventory/add")}
               className="bg-indigo-600 text-white flex items-center gap-2 px-6 py-3 rounded-2xl shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all font-black"
             >
-              <Plus size={20} /> إضافة مركبة
+              <Plus size={20} /> {t('nav_add_car')}
             </button>
           )}
         </div>
       </div>
-
       {/* فلاتر الحالة (جديد / مستعمل) */}
       <div className="flex justify-center md:justify-start gap-3 mb-10">
         <button
           onClick={() => setCarConditionFilter("All")}
           className={`px-6 py-2 rounded-full text-sm font-black transition-all ${
-            carConditionFilter === "All" ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            carConditionFilter === "All" ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
           }`}
         >
-          كل السيارات
+          {t('inventory_filter_all')}
         </button>
         <button
           onClick={() => setCarConditionFilter("New")}
           className={`px-6 py-2 rounded-full text-sm font-black transition-all ${
-            carConditionFilter === "New" ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            carConditionFilter === "New" ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
           }`}
         >
-          جديد
+          {t('inventory_filter_new')}
         </button>
         <button
           onClick={() => setCarConditionFilter("Used")}
           className={`px-6 py-2 rounded-full text-sm font-black transition-all ${
-            carConditionFilter === "Used" ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            carConditionFilter === "Used" ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
           }`}
         >
-          مستعمل
+          {t('inventory_filter_used')}
         </button>
       </div>
-
       {/* الإحصائيات */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         <StatsCard 
           icon={Car} 
           bg="bg-slate-900" 
           color="text-white"
-          label="إجمالي الأسطول" 
+          label={t('inventory_total_fleet')} 
           val={stats?.inventory.total.toString() ?? "..."}
-          unit="سيارة"
+          unit={t('dashboard_unit_car')}
         />
         <StatsCard 
           icon={CheckCircle2} 
           bg="bg-emerald-500" 
           color="text-white"
-          label="متوفر للبيع" 
+          label={t('dashboard_available_stock')} 
           val={stats?.inventory.available.toString() ?? "..."} 
-          unit="سيارة"
+          unit={t('dashboard_unit_car')}
         />
         <StatsCard 
           icon={DollarSign} 
           bg="bg-blue-600" 
           color="text-white"
-          label="قيمة المخزون الكلية" 
+          label={t('inventory_total_stock_value')} 
           val={stats ? (stats.financials.stockValue / 1000000).toFixed(1) : "..."} 
-          unit="M د.ج"
+          unit={language === 'ar' ? 'مليون د.ج' : 'M DZD'}
         />
         <StatsCard 
           icon={Clock} 
           bg="bg-amber-500" 
           color="text-white"
-          label="قيد الانتظار" 
+          label={t('inventory_pending')} 
           val={stats?.inventory.reserved.toString() ?? "..."} 
-          unit="سيارة"
+          unit={t('dashboard_unit_car')}
         />
       </div>
 
       {/* الجدول */}
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-white/5 overflow-hidden">
+        <div className="p-8 border-b border-slate-50 dark:border-white/5 flex items-center justify-between bg-slate-50/30 dark:bg-slate-800/10">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white rounded-xl shadow-sm">
+            <div className="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm">
               <ListIcon className="text-indigo-600" size={20} />
             </div>
-            <h2 className="font-black text-slate-800">قائمة المركبات الحالية</h2>
+            <h2 className="font-black text-slate-800 dark:text-white">{t('inventory_list_title')}</h2>
           </div>
         </div>
-
         <div className="overflow-x-auto">
-          <table className="w-full text-right border-collapse">
+          <table className={`w-full ${isRtl ? 'text-right' : 'text-left'} border-collapse`}>
             <thead>
               <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.15em] border-b border-slate-50 bg-slate-50/30">
-                <th className="px-8 py-5">المركبة</th>
-                <th className="px-8 py-5">المواصفات</th>
-                <th className="px-8 py-5 text-right">السعر المعروض</th>
-                <th className="px-8 py-5 text-right">الحالة</th>
-                {user?.role !== "viewer" && <th className="px-8 py-5 text-right">الإجراءات</th>}
+                <th className="px-8 py-5">{t('dashboard_th_vehicle')}</th>
+                <th className="px-8 py-5">{t('inventory_th_specifications')}</th>
+                <th className={`px-8 py-5 ${isRtl ? 'text-right' : 'text-left'}`}>{t('inventory_th_price')}</th>
+                <th className={`px-8 py-5 ${isRtl ? 'text-right' : 'text-left'}`}>{t('dashboard_th_status')}</th>
+                {user?.role !== "viewer" && <th className={`px-8 py-5 ${isRtl ? 'text-right' : 'text-left'}`}>{t('inventory_th_actions')}</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -226,7 +219,7 @@ const InventoryPage = () => {
                         <img 
                           src={car.mainImageUrl || "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=150"} 
                           className="w-full h-full object-cover"
-                          alt="صورة السيارة"
+                          alt={t('dashboard_th_vehicle')}
                         />
                       </div>
                       <div>
@@ -236,14 +229,14 @@ const InventoryPage = () => {
                   </td>
                   <td className="px-8 py-5">
                     <div className="flex flex-col gap-1">
-                      <span className="text-xs font-bold text-slate-600 italic">سنة الصنع: {car.year}</span>
-                      <span className="text-[10px] text-slate-400 font-black">{car.color || 'غير محدد'}</span>
+                      <span className="text-xs font-bold text-slate-600 italic">{t('inventory_spec_year')}{car.year}</span>
+                      <span className="text-[10px] text-slate-400 font-black">{car.color || t('inventory_spec_not_specified')}</span>
                     </div>
                   </td>
-                  <td className="px-8 py-5 font-black text-slate-900 tabular-nums">
-                    {(car.price || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-medium">د.ج</span>
+                  <td className={`px-8 py-5 font-black text-slate-900 tabular-nums ${isRtl ? 'text-right' : 'text-left'}`}>
+                    {(car.price || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-medium">{t('dzd')}</span>
                   </td>
-                  <td className="px-8 py-5">
+                  <td className={`px-8 py-5 ${isRtl ? 'text-right' : 'text-left'}`}>
                     <span className={`px-3 py-1 rounded-lg text-[10px] font-black ${
                       car.status === "Available" 
                       ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
@@ -255,13 +248,13 @@ const InventoryPage = () => {
                     </span>
                   </td>
                   {user?.role !== "viewer" && (
-                    <td className="px-8 py-5">
+                    <td className={`px-8 py-5 ${isRtl ? 'text-right' : 'text-left'}`}>
                       <div className="flex items-center gap-2 justify-end">
                         {user?.role === "admin" && car.status !== "Available" && (
                           <button 
                             onClick={() => handleResetStatus(car._id, `${car.make} ${car.model}`)}
                             className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-300 transition-all"
-                            title="إعادة السيارة متاحة للبيع"
+                            title={t('inventory_restore_btn_title')}
                           >
                             <RefreshCw size={16} />
                           </button>
@@ -271,7 +264,7 @@ const InventoryPage = () => {
                           <button 
                             onClick={() => handleOpenSaleModal(car._id)}
                             className="p-2 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg text-slate-300 transition-all"
-                            title="إتمام عملية البيع"
+                            title={t('inventory_sell_btn_title')}
                           >
                             <DollarSign size={16} />
                           </button>
@@ -299,8 +292,8 @@ const InventoryPage = () => {
               ))}
               {filteredCars.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-8 py-16 text-center text-slate-300 font-bold italic">
-                    لا يوجد بيانات لعرضها حالياً..
+                  <td colSpan={user?.role === "viewer" ? 4 : 5} className="px-8 py-16 text-center text-slate-300 font-bold italic">
+                    {t('inventory_no_data')}
                   </td>
                 </tr>
               )}
