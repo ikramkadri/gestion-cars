@@ -1,30 +1,32 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "convex/react";
-import LoginPage from "./pages/LoginPage";
 import AdminLayout from "./layouts/AdminLayout";
-import LandingPage from "./pages/LandingPage";
-import Dashboard from "./pages/Dashboard";
-import VerifyEmailPage from "./pages/VerifyEmailPage";
-import InventoryPage from "./pages/InventoryPage";
-import AddCarPage from "./pages/AddCarPage";
-import EditCarPage from "./pages/EditCarPage";
-import SalesPage from "./pages/SalesPage";
-import CustomersPage from "./pages/CustomersPage";
-import UsersPage from "./pages/UsersPage";
-import BookingsPage from "./pages/BookingsPage";
-import InvoicesPage from "./pages/InvoicesPage";
-import StatisticsPage from "./pages/StatisticsPage";
-import OrdersPage from "./pages/OrdersPage";
-import NotificationsPage from "./pages/NotificationsPage";
-import ArchivedInventoryPage from "./pages/ArchivedInventoryPage";
-import SettingsPage from "./pages/SettingsPage";
 import Navbar from "./components/Navbar";
 import { LanguageProvider } from "./lib/LanguageContext";
 import { Toaster } from 'react-hot-toast';
 import LoadingScreen from "./components/LoadingScreen";
 import { api } from "../convex/_generated/api";
-import CarDetailsPage from "./pages/CarDetailsPage";
+
+// Route-level code splitting — each page is loaded on demand
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const VerifyEmailPage = lazy(() => import("./pages/VerifyEmailPage"));
+const InventoryPage = lazy(() => import("./pages/InventoryPage"));
+const AddCarPage = lazy(() => import("./pages/AddCarPage"));
+const EditCarPage = lazy(() => import("./pages/EditCarPage"));
+const SalesPage = lazy(() => import("./pages/SalesPage"));
+const CustomersPage = lazy(() => import("./pages/CustomersPage"));
+const UsersPage = lazy(() => import("./pages/UsersPage"));
+const BookingsPage = lazy(() => import("./pages/BookingsPage"));
+const InvoicesPage = lazy(() => import("./pages/InvoicesPage"));
+const StatisticsPage = lazy(() => import("./pages/StatisticsPage"));
+const OrdersPage = lazy(() => import("./pages/OrdersPage"));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
+const ArchivedInventoryPage = lazy(() => import("./pages/ArchivedInventoryPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const CarDetailsPage = lazy(() => import("./pages/CarDetailsPage"));
 
 export default function App() {
   return (
@@ -41,22 +43,24 @@ function AppContent() {
   return (
     <LanguageProvider>
       <Toaster position="top-center" reverseOrder={false} />
-      <Routes>
-        {/* الصفحة الرئيسية: صفحة الهبوط التي تحتوي على السيارة والتحريك */}
-        <Route path="/" element={<><Navbar onOpenAuth={() => navigate("/login")} /><LandingPage /></>} /> 
-        
-        {/* مسار عام لرؤية تفاصيل السيارة للجميع */}
-        <Route path="/inventory/:carId" element={<><Navbar onOpenAuth={() => navigate("/login")} /><CarDetailsPage /></>} />
-        
-        {/* مسار توثيق الإيميل */}
-        <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          {/* Landing page */}
+          <Route path="/" element={<><Navbar onOpenAuth={() => navigate("/login")} /><LandingPage /></>} /> 
+          
+          {/* Public car details */}
+          <Route path="/inventory/:carId" element={<><Navbar onOpenAuth={() => navigate("/login")} /><CarDetailsPage /></>} />
+          
+          {/* Email verification */}
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
 
-        <Route path="/login" element={token ? <Navigate to="/admin" /> : <LoginPage />} />
-        
-        <Route path="/admin/*" element={token ? <AuthenticatedApp /> : <Navigate to="/login" />} />
+          <Route path="/login" element={token ? <Navigate to="/admin" /> : <LoginPage />} />
+          
+          <Route path="/admin/*" element={token ? <AuthenticatedApp /> : <Navigate to="/login" />} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </LanguageProvider>
   );
 }
@@ -79,7 +83,6 @@ function AuthenticatedApp() {
     return <LoadingScreen />;
   }
 
-  // إذا كانت النتيجة null والتوكن موجود، فهذا يعني أن التوكن تالف أو منتهي
   if (user === null && token) {
     localStorage.removeItem("convex_token"); // حذف التوكن فوراً لكسر الحلقة المفرغة
     return <Navigate to="/login" replace />;
@@ -87,25 +90,27 @@ function AuthenticatedApp() {
 
   return (
     <AdminLayout>
-      <Routes>
-        <Route index element={
-          user?.role === "admin" || user?.role === "sales_manager" ? <Dashboard /> : <Navigate to="/admin/inventory" replace />
-        } />
-        <Route path="inventory" element={<InventoryPage />} />
-        <Route path="inventory/add" element={<AddCarPage />} />
-        <Route path="inventory/edit/:carId" element={<EditCarPage />} />
-        <Route path="inventory/archived" element={<ArchivedInventoryPage />} />
-        <Route path="sales" element={<SalesPage />} />
-        <Route path="customers" element={<CustomersPage />} />
-        <Route path="users" element={<UsersPage />} />
-        <Route path="bookings" element={<BookingsPage />} />
-        <Route path="orders" element={<OrdersPage />} />
-        <Route path="notifications" element={<NotificationsPage />} />
-        <Route path="invoices" element={<InvoicesPage />} />
-        <Route path="statistics" element={<StatisticsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to="/admin" replace />} />
-      </Routes>
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route index element={
+            user?.role === "admin" || user?.role === "sales_manager" ? <Dashboard /> : <Navigate to="/admin/inventory" replace />
+          } />
+          <Route path="inventory" element={<InventoryPage />} />
+          <Route path="inventory/add" element={<AddCarPage />} />
+          <Route path="inventory/edit/:carId" element={<EditCarPage />} />
+          <Route path="inventory/archived" element={<ArchivedInventoryPage />} />
+          <Route path="sales" element={<SalesPage />} />
+          <Route path="customers" element={<CustomersPage />} />
+          <Route path="users" element={<UsersPage />} />
+          <Route path="bookings" element={<BookingsPage />} />
+          <Route path="orders" element={<OrdersPage />} />
+          <Route path="notifications" element={<NotificationsPage />} />
+          <Route path="invoices" element={<InvoicesPage />} />
+          <Route path="statistics" element={<StatisticsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to="/admin" replace />} />
+        </Routes>
+      </Suspense>
     </AdminLayout>
   );
 }

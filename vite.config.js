@@ -8,4 +8,7 @@ export default defineConfig({
             "@": path.resolve(__dirname, "./src"),
         },
     },
+    build: {
+        chunkSizeWarningLimit: 1000, // suppress warning for dynamically-imported html2pdf (975KB)
+    },
 });
