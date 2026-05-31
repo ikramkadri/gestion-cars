@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useQuery, useMutation } from 'convex/react';
 import { toast } from 'react-hot-toast';
 import { api } from '../../convex/_generated/api';
@@ -12,6 +12,13 @@ import en from '../lib/i18n/pages/admin-layout/en.json';
 import fr from '../lib/i18n/pages/admin-layout/fr.json';
 const AdminLayout = ({ children }: { children?: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+  const location = useLocation();
+  
+  // Focus main content on route change for keyboard/screen reader users
+  useEffect(() => {
+    mainRef.current?.focus();
+  }, [location.pathname]);
   const { t, isRtl } = usePageTranslation({ ar, en, fr });
   const token = localStorage.getItem("convex_token") ?? undefined;
   const user = useQuery(api.users.viewer, token ? { token } : "skip");
@@ -56,7 +63,7 @@ const AdminLayout = ({ children }: { children?: React.ReactNode }) => {
         />
       </div>
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto w-full">
+      <main ref={mainRef} tabIndex={-1} className="flex-1 overflow-y-auto w-full outline-none">
         {children || <Outlet />}
       </main>
     </div>

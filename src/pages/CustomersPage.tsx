@@ -10,6 +10,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { Doc, Id } from '../../convex/_generated/dataModel';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useReducedMotion } from '../lib/useReducedMotion';
 import { usePageTranslation } from '../lib/i18n/usePageTranslation';
 import ar from '../lib/i18n/pages/customers/ar.json';
 import en from '../lib/i18n/pages/customers/en.json';
@@ -26,6 +27,8 @@ interface StatCard {
 
 const CustomersPage = () => {
   const token = localStorage.getItem("convex_token") || "";
+  const reduced = useReducedMotion();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<'customers' | 'users'>('customers');
 
@@ -222,13 +225,13 @@ const CustomersPage = () => {
     : users === undefined;
 
   if (isDataLoading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F8F9FD] dark:bg-slate-950">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <Loader2 className="animate-spin text-indigo-600 dark:text-blue-500" size={40} />
     </div>
   );
 
   return (
-    <div className="min-h-screen p-4 md:p-8 bg-[#F8F9FD] dark:bg-slate-950 font-sans text-right transition-colors duration-300" dir="rtl">
+    <div className="min-h-screen p-4 md:p-8 bg-background font-sans text-right transition-colors duration-300" dir="rtl">
       {/* رأس الصفحة */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
@@ -528,18 +531,18 @@ const CustomersPage = () => {
             
             {/* الخلفية المظلمة */}
             <motion.div 
-              initial={{ opacity: 0 }}
+              initial={reduced ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              exit={reduced ? undefined : { opacity: 0 }}
               onClick={() => setEditingCustomer(null)}
               className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
             />
             
             {/* محتوى المودال */}
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              initial={reduced ? false : { opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              exit={reduced ? undefined : { opacity: 0, scale: 0.95, y: 10 }}
               className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden relative z-10 p-6 md:p-8"
             >
               
@@ -676,18 +679,18 @@ const CustomersPage = () => {
             
             {/* الخلفية المظلمة */}
             <motion.div 
-              initial={{ opacity: 0 }}
+              initial={reduced ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              exit={reduced ? undefined : { opacity: 0 }}
               onClick={() => setIsAddModalOpen(false)}
               className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
             />
             
             {/* محتوى المودال */}
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              initial={reduced ? false : { opacity: 0, scale: 0.95, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              exit={reduced ? undefined : { opacity: 0, scale: 0.95, y: 10 }}
               className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden relative z-10 p-6 md:p-8"
             >
               

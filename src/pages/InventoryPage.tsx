@@ -13,7 +13,8 @@ import {
   List as ListIcon,
   Trash2, 
   Edit3,
-  RefreshCw
+  RefreshCw,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Id } from "../../convex/_generated/dataModel";
@@ -21,6 +22,7 @@ import { CarType } from '../features/cars/types/car.types';
 import StatsCard from '../components/StatsCard'; // استيراد مكون بطاقة الإحصائيات الموحد
 import SaleFormModal from '../components/SaleFormModal';
 import Confetti from 'react-confetti'; // استيراد مكون القصاصات
+import ConfirmDialog from '../components/ConfirmDialog';
 import { useWindowSize } from 'react-use'; // استيراد هوك لمعرفة أبعاد النافذة
 import ar from '../lib/i18n/pages/inventory/ar.json';
 import en from '../lib/i18n/pages/inventory/en.json';
@@ -51,41 +53,64 @@ const InventoryPage = () => {
   const [showConfetti, setShowConfetti] = useState(false); // حالة جديدة للتحكم في القصاصات
   const { width, height } = useWindowSize(); // للحصول على أبعاد الشاشة للقصاصات
   const [selectedCarIdForSale, setSelectedCarIdForSale] = useState<Id<"cars"> | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    variant: 'destructive' | 'warning' | 'info';
+    confirmLabel: string;
+    onConfirm: () => void;
+  }>({ open: false, title: '', description: '', variant: 'info', confirmLabel: '', onConfirm: () => {} });
+  const showConfirm = (opts: { title: string; description: string; variant?: 'destructive' | 'warning' | 'info'; confirmLabel?: string; onConfirm: () => void }) =>
+    setConfirmDialog({ open: true, ...opts, variant: opts.variant || 'info', confirmLabel: opts.confirmLabel || 'Confirm' });
+
 
   const filteredCars: CarType[] = (cars as CarType[] || [])?.filter((car: CarType) => 
     car.make.toLowerCase().includes(searchQuery.toLowerCase()) || 
     car.model.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
-  const handleDelete = async (id: Id<"cars">) => {
-    if (window.confirm(t('inventory_delete_confirm'))) {
-      const toastId = toast.loading(t('inventory_delete_loading'));
-      try {
-        const token = localStorage.getItem("convex_token") || "";
-        await removeCar({ carId: id, token: token });
-        toast.success(t('inventory_delete_success'), { id: toastId });
-      } catch (error: unknown) {
-        console.error("Delete error:", error);
-        toast.error(t('inventory_delete_error'), { id: toastId });
-      }
-    }
+  const handleDelete = async (id: Id<"cars">, name: string) => {
+    showConfirm({
+      title: t('inventory_delete_title'),
+      description: t('inventory_delete_confirm').replace('{name}', name),
+      variant: 'destructive',
+      confirmLabel: t('inventory_delete_button') || 'Delete',
+      onConfirm: async () => {
+        const toastId = toast.loading(t('inventory_delete_loading'));
+        try {
+          const token = localStorage.getItem("convex_token") || "";
+          await removeCar({ carId: id, token: token });
+          toast.success(t('inventory_delete_success'), { id: toastId });
+        } catch {
+          toast.error(t('inventory_delete_error'), { id: toastId });
+        }
+      },
+    });
   };
 
+
   const handleResetStatus = async (id: Id<"cars">, name: string) => {
-    if (window.confirm(t('inventory_status_restore_confirm').replace('{name}', name))) {
-      const toastId = toast.loading(t('inventory_status_restore_loading'));
-      try {
-        const token = localStorage.getItem("convex_token") || "";
-        await updateCar({ 
-          token, 
-          carId: id, 
-          updates: { status: "Available", isArchived: false } 
-        });
-        toast.success(t('inventory_status_restore_success'), { id: toastId });
-      } catch {
-        toast.error(t('inventory_status_restore_error'), { id: toastId });
-      }
-    }
+    showConfirm({
+      title: t('inventory_restore_title'),
+      description: t('inventory_status_restore_confirm').replace('{name}', name),
+      variant: 'warning',
+      confirmLabel: t('inventory_restore_button') || 'Restore',
+      onConfirm: async () => {
+        const toastId = toast.loading(t('inventory_status_restore_loading'));
+        try {
+          const token = localStorage.getItem("convex_token") || "";
+          await updateCar({ 
+            token, 
+            carId: id, 
+            updates: { status: "Available", isArchived: false } 
+          });
+          toast.success(t('inventory_status_restore_success'), { id: toastId });
+        } catch {
+          toast.error(t('inventory_status_restore_error'), { id: toastId });
+        }
+      },
+    });
   };
 
   const handleOpenSaleModal = (carId: Id<"cars">) => {
@@ -94,7 +119,7 @@ const InventoryPage = () => {
   };
 
   return (
-    <div className={`min-h-screen p-4 md:p-8 bg-slate-50 dark:bg-background font-sans ${isRtl ? 'text-right' : 'text-left'} transition-colors duration-300`} dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className={`min-h-screen p-4 md:p-8 bg-background font-sans ${isRtl ? 'text-right' : 'text-left'} transition-colors duration-300`} dir={isRtl ? 'rtl' : 'ltr'}>
       {/* العنوان والبحث */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
         <div>
@@ -113,7 +138,7 @@ const InventoryPage = () => {
               placeholder={t('inventory_search_placeholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 ${isRtl ? 'pr-11 pl-4 text-right' : 'pl-11 pr-4 text-left'} py-3 rounded-2xl w-full md:w-72 focus:ring-2 focus:ring-indigo-500/10 dark:focus:ring-blue-500/20 outline-none font-bold text-slate-700 dark:text-slate-200 transition-all shadow-sm`}
+              className={`bg-card border-border ${isRtl ? 'pr-11 pl-4 text-right' : 'pl-11 pr-4 text-left'} py-3 rounded-2xl w-full md:w-72 focus:ring-2 focus:ring-indigo-500/10 dark:focus:ring-blue-500/20 outline-none font-bold text-card-foreground/80 transition-all shadow-sm`}
             />
           </div>
           {user?.role !== "viewer" && (
@@ -131,7 +156,7 @@ const InventoryPage = () => {
         <button
           onClick={() => setCarConditionFilter("All")}
           className={`px-6 py-2 rounded-full text-sm font-black transition-all ${
-            carConditionFilter === "All" ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
+            carConditionFilter === "All" ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-card text-slate-600 dark:text-slate-400 border-border hover:bg-muted/50 dark:hover:bg-white/5'
           }`}
         >
           {t('inventory_filter_all')}
@@ -139,7 +164,7 @@ const InventoryPage = () => {
         <button
           onClick={() => setCarConditionFilter("New")}
           className={`px-6 py-2 rounded-full text-sm font-black transition-all ${
-            carConditionFilter === "New" ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
+            carConditionFilter === "New" ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-card text-slate-600 dark:text-slate-400 border-border hover:bg-muted/50 dark:hover:bg-white/5'
           }`}
         >
           {t('inventory_filter_new')}
@@ -147,7 +172,7 @@ const InventoryPage = () => {
         <button
           onClick={() => setCarConditionFilter("Used")}
           className={`px-6 py-2 rounded-full text-sm font-black transition-all ${
-            carConditionFilter === "Used" ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5'
+            carConditionFilter === "Used" ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-card text-slate-600 dark:text-slate-400 border-border hover:bg-muted/50 dark:hover:bg-white/5'
           }`}
         >
           {t('inventory_filter_used')}
@@ -157,7 +182,7 @@ const InventoryPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         <StatsCard 
           icon={Car} 
-          bg="bg-slate-900" 
+          bg="bg-primary"
           color="text-white"
           label={t('inventory_total_fleet')} 
           val={stats?.inventory.total.toString() ?? "..."}
@@ -190,10 +215,10 @@ const InventoryPage = () => {
       </div>
 
       {/* الجدول */}
-      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-sm border border-slate-100 dark:border-white/5 overflow-hidden">
-        <div className="p-8 border-b border-slate-50 dark:border-white/5 flex items-center justify-between bg-slate-50/30 dark:bg-slate-800/10">
+      <div className="bg-card rounded-[2.5rem] shadow-sm border-border overflow-hidden">
+        <div className="p-8 border-b border-border flex items-center justify-between bg-muted/30 dark:bg-muted/10">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm">
+            <div className="p-2 bg-background dark:bg-muted rounded-xl shadow-sm">
               <ListIcon className="text-indigo-600" size={20} />
             </div>
             <h2 className="font-black text-slate-800 dark:text-white">{t('inventory_list_title')}</h2>
@@ -202,7 +227,7 @@ const InventoryPage = () => {
         <div className="overflow-x-auto">
           <table className={`w-full ${isRtl ? 'text-right' : 'text-left'} border-collapse`}>
             <thead>
-              <tr className="text-slate-400 text-[10px] font-black uppercase tracking-[0.15em] border-b border-slate-50 bg-slate-50/30">
+              <tr className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.15em] border-b border-border bg-muted/30">
                 <th className="px-8 py-5">{t('dashboard_th_vehicle')}</th>
                 <th className="px-8 py-5">{t('inventory_th_specifications')}</th>
                 <th className={`px-8 py-5 ${isRtl ? 'text-right' : 'text-left'}`}>{t('inventory_th_price')}</th>
@@ -210,15 +235,15 @@ const InventoryPage = () => {
                 {user?.role !== "viewer" && <th className={`px-8 py-5 ${isRtl ? 'text-right' : 'text-left'}`}>{t('inventory_th_actions')}</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-border">
               {filteredCars.map((car: CarType) => (
-                <tr key={car._id} className="hover:bg-slate-50/80 transition-all group">
+                <tr key={car._id} className="hover:bg-muted/50 transition-all group" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/admin/inventory/${car._id}`); } }}>
                   <td 
                     className="px-8 py-5 cursor-pointer"
                     onClick={() => navigate(`/admin/inventory/${car._id}`)}
                   >
                     <div className="flex items-center gap-4 group/item">
-                      <div className="w-14 h-10 rounded-lg bg-slate-100 overflow-hidden border border-transparent group-hover/item:border-indigo-500 transition-all">
+                      <div className="w-14 h-10 rounded-lg bg-muted overflow-hidden border border-transparent group-hover/item:border-indigo-500 transition-all">
                         <img 
                           src={car.mainImageUrl || "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?q=80&w=150"} 
                           className="w-full h-full object-cover"
@@ -240,14 +265,14 @@ const InventoryPage = () => {
                     {(car.price || 0).toLocaleString()} <span className="text-[10px] text-slate-400 font-medium">{t('dzd')}</span>
                   </td>
                   <td className={`px-8 py-5 ${isRtl ? 'text-right' : 'text-left'}`}>
-                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black ${
-                      car.status === "Available" 
-                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black ${
+                      car.status === "Available"
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                       : car.status === "Reserved"
                       ? 'bg-amber-100 text-amber-700 border border-amber-200'
                       : 'bg-rose-50 text-rose-600 border border-rose-100'
                     }`}>
-                      {car.status === "Available" ? sl.available : car.status === "Reserved" ? sl.reserved : sl.sold}
+                      {car.status === "Available" ? <><CheckCircle2 size={12} /> {sl.available}</> : car.status === "Reserved" ? <><Clock size={12} /> {sl.reserved}</> : <><XCircle size={12} /> {sl.sold}</>}
                     </span>
                   </td>
                   {user?.role !== "viewer" && (
@@ -256,7 +281,7 @@ const InventoryPage = () => {
                         {user?.role === "admin" && car.status !== "Available" && (
                           <button 
                             onClick={() => handleResetStatus(car._id, `${car.make} ${car.model}`)}
-                            className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-300 transition-all"
+                            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 rounded-lg text-slate-300 transition-all"
                             title={t('inventory_restore_btn_title')}
                           >
                             <RefreshCw size={16} />
@@ -266,7 +291,7 @@ const InventoryPage = () => {
                          (car.status === "Available" || car.status === "Reserved") && (
                           <button 
                             onClick={() => handleOpenSaleModal(car._id)}
-                            className="p-2 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg text-slate-300 transition-all"
+                            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-emerald-50 hover:text-emerald-600 rounded-lg text-slate-300 transition-all"
                             title={t('inventory_sell_btn_title')}
                           >
                             <DollarSign size={16} />
@@ -275,15 +300,15 @@ const InventoryPage = () => {
                         {(user?.role === "admin" || user?.role === "sales_manager") && (
                           <button 
                             onClick={() => navigate(`/admin/inventory/edit/${car._id}`)}
-                            className="p-2 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-300 transition-all"
+                            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-indigo-50 hover:text-indigo-600 rounded-lg text-slate-300 transition-all"
                           >
                             <Edit3 size={16} />
                           </button>
                         )}
                         {user?.role === "admin" && (
                           <button 
-                            onClick={() => handleDelete(car._id)}
-                            className="p-2 hover:bg-rose-50 hover:text-rose-600 rounded-lg text-slate-300 transition-all"
+                            onClick={() => handleDelete(car._id, `${car.make} ${car.model}`)}
+                            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-rose-50 hover:text-rose-600 rounded-lg text-slate-300 transition-all"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -327,6 +352,16 @@ const InventoryPage = () => {
           style={{ zIndex: 5000, position: 'fixed', top: 0, left: 0 }} // رفع الـ zIndex فوق كل شيء
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        onOpenChange={(open) => setConfirmDialog((prev) => ({ ...prev, open }))}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        variant={confirmDialog.variant}
+        confirmLabel={confirmDialog.confirmLabel}
+        onConfirm={confirmDialog.onConfirm}
+      />
     </div>
   );
 };

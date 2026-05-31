@@ -12,8 +12,10 @@ import ar from '../lib/i18n/pages/dashboard/ar.json';
 import en from '../lib/i18n/pages/dashboard/en.json';
 import fr from '../lib/i18n/pages/dashboard/fr.json';
 import { usePageTranslation } from '../lib/i18n/usePageTranslation';
+import { timeAgo } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useReducedMotion } from '../lib/useReducedMotion';
 
 // ---- Animation Variants ----
 const containerVariants = {
@@ -94,6 +96,8 @@ const EmptyState = ({
 );
 
 const Dashboard = () => {
+  const reduced = useReducedMotion();
+
   const token = localStorage.getItem("convex_token") ?? undefined;
   const navigate = useNavigate();
   const { t, language, isRtl } = usePageTranslation({ ar, en, fr });
@@ -116,7 +120,7 @@ const Dashboard = () => {
     <div className="min-h-screen p-4 md:p-8 font-sans" dir={isRtl ? 'rtl' : 'ltr'}>
       {/* ---- Header ---- */}
       <motion.div 
-        initial={{ opacity: 0, y: -10 }}
+        initial={reduced ? false : { opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] as const }}
         className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 md:mb-10"
@@ -140,7 +144,7 @@ const Dashboard = () => {
       {/* ---- Stats Cards ---- */}
       <motion.div 
         variants={containerVariants}
-        initial="hidden"
+        initial={reduced ? false : "hidden"}
         animate="visible"
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10"
       >
@@ -192,10 +196,9 @@ const Dashboard = () => {
         )}
       </motion.div>
 
-      {/* ---- Quick Actions (Admin only) ---- */}
-      {user?.role === 'admin' && (
+      {(user?.role === 'admin' || user?.role === 'sales_manager') && (
         <motion.div 
-          initial="hidden"
+          initial={reduced ? false : "hidden"}
           animate="visible"
           variants={fadeUp}
           className="mb-10"
@@ -217,8 +220,8 @@ const Dashboard = () => {
             ].map(({ icon: Icon, label, path, iconBg, iconColor, hoverBg, borderHover }) => (
               <motion.button
                 key={path}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.97 }}
+                whileHover={reduced ? {} : { scale: 1.02 }}
+                whileTap={reduced ? {} : { scale: 0.97 }}
                 onClick={() => navigate(path)}
                 className={`p-5 md:p-6 bg-card rounded-3xl border border-border shadow-sm hover:shadow-md transition-all flex flex-col items-center gap-3 group ${borderHover}`}
               >
@@ -234,7 +237,7 @@ const Dashboard = () => {
 
       {/* ---- Chart + Activity Feed ---- */}
       <motion.div 
-        initial="hidden"
+        initial={reduced ? false : "hidden"}
         animate="visible"
         variants={fadeUp}
         className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8"
@@ -261,12 +264,12 @@ const Dashboard = () => {
             <div className="space-y-6">
               {latestLogs.map((log: Doc<"activity_logs"> & { userName: string }) => (
                 <div key={log._id} className={`relative flex gap-4 items-start pb-6 ${isRtl ? 'border-r-2 pr-4' : 'border-l-2 pl-4'} border-border last:border-0 last:pb-0`}>
-                  <div className={`absolute ${isRtl ? '-right-[9px]' : '-left-[9px]'} top-0 w-4 h-4 rounded-full bg-card border-4 border-indigo-500`} />
+                  <div className={`absolute ${isRtl ? '-right-2' : '-left-2'} top-0 w-4 h-4 rounded-full bg-card border-4 border-indigo-500`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-1 gap-2">
                       <p className="text-sm font-black text-card-foreground truncate">{log.userName}</p>
-                      <span className="text-[10px] text-muted-foreground font-bold shrink-0">
-                        {new Date(log.createdAt).toLocaleTimeString(language === 'ar' ? 'ar-DZ' : 'fr-FR')}
+                      <span className="text-[10px] text-muted-foreground font-bold shrink-0 whitespace-nowrap">
+                        {timeAgo(log.createdAt, language === 'ar' ? 'ar-DZ' : language === 'fr' ? 'fr-FR' : 'en-US')}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground font-medium leading-relaxed">
@@ -290,7 +293,7 @@ const Dashboard = () => {
       {/* ---- Recent Sales Table ---- */}
       {user?.role !== 'viewer' && (
         <motion.div 
-          initial="hidden"
+          initial={reduced ? false : "hidden"}
           animate="visible"
           variants={fadeUp}
           className="mt-8 md:mt-10"
