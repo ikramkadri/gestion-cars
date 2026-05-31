@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { ArrowRight } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import AddCarForm, { CarFormData } from '../components/AddCarForm';
 
@@ -55,21 +54,10 @@ export default function AddCarPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500" dir="rtl">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white rounded-full transition-colors">
-            <ArrowRight size={24} />
-          </button>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tighter">إضافة سيارة جديدة</h1>
-        </div>
-      </div>
-
-      <AddCarForm 
-        title="إضافة مركبة جديدة" 
-        onSubmit={handleSubmit} 
-        isLoading={isLoading} 
-      />
-    </div>
+    <AddCarForm 
+      title="إضافة مركبة جديدة" 
+      onSubmit={handleSubmit} 
+      isLoading={isLoading} 
+    />
   );
 }

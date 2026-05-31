@@ -1,0 +1,17 @@
+{
+  "mark_all_read_success": "All marked as read",
+  "mark_all_read_error": "Failed to update notifications",
+  "delete_success": "Notification deleted",
+  "delete_error": "Only admins can delete notifications",
+  "new_notifications": "{count} New Notifications",
+  "page_title": "Notifications Center",
+  "page_title_highlight": "Notifications",
+  "page_desc": "Complete record of activities, bookings, and system updates at MOTORIX.",
+  "mark_all_read": "Mark All as Read",
+  "filter_all": "All",
+  "filter_bookings": "Bookings",
+  "filter_updates": "Updates",
+  "filter_success": "Success",
+  "filter_warnings": "Warnings",
+  "priority_high": "High Priority"
+}

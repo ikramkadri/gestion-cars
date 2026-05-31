@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Car, MapPin, CheckCircle2, AlertTriangle, X,
   ChevronLeft, ChevronRight,
@@ -112,21 +113,21 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ label, value, onC
 
   return (
     <div className="space-y-2 relative" ref={wrapperRef}>
-      <label className="text-sm font-bold text-gray-600 mr-2 block text-right">{label}</label>
+      <label className="text-sm font-bold text-gray-600 dark:text-slate-400 mr-2 block text-right">{label}</label>
       <div className="relative">
         <input 
           value={value} 
           onChange={handleInputChange} 
           onFocus={() => { if(value.length === 0) { setFiltered(suggestions); setShow(true); } }}
-          className="w-full p-4 pr-12 rounded-2xl border-2 border-transparent focus:border-blue-500 focus:bg-white outline-none bg-white shadow-sm transition-all text-right" 
+          className="w-full p-4 pr-12 rounded-2xl border-2 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 outline-none bg-white dark:bg-slate-800 shadow-sm transition-all text-right text-slate-800 dark:text-white" 
           placeholder={placeholder} 
         />
-        {Icon && <Icon className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300" size={20} />}
+        {Icon && <Icon className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-350 dark:text-slate-500" size={20} />}
       </div>
       {show && filtered.length > 0 && (
-        <div className="absolute z-50 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+        <div className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
           {filtered.map((opt, i) => (
-            <button key={i} onClick={() => { onChange(opt); setShow(false); }} className="w-full text-right p-4 hover:bg-blue-50 text-gray-700 font-bold transition-colors border-b border-gray-50 last:border-0">
+            <button key={i} onClick={() => { onChange(opt); setShow(false); }} className="w-full text-right p-4 hover:bg-blue-50 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 font-bold transition-colors border-b border-gray-50 dark:border-slate-700 last:border-0">
               {opt}
             </button>
           ))}
@@ -321,45 +322,53 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
     setShowConfirmModal(false);
   };
 
+  const navigate = useNavigate();
   const profit = formData.price - formData.purchasePrice;
   const isLoss = profit < 0;
 
   return (
-    <div className="max-w-4xl mx-auto p-4 md:p-8 bg-white min-h-screen rtl font-sans" dir="rtl">
-      {/* Header */}
-      <div className="mb-10 text-right flex justify-between items-end">
-        <div>
-           <h1 className="text-3xl font-black text-gray-900 mb-2">{title || 'إضافة سيارة للمخزون'}</h1>
-           <p className="text-gray-500 font-medium">أكمل البيانات لإدراج السيارة في نظام الجرد الذكي</p>
-        </div>
-        <div className="hidden md:block">
-            <div className="bg-slate-100 p-2 rounded-2xl flex items-center gap-2">
-                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-blue-600">
-                    <Settings2 size={20} />
-                </div>
-                <span className="text-xs font-black px-2">v2.5.0</span>
+    <div className="w-full min-h-screen p-4 md:p-8 bg-slate-50 dark:bg-background font-sans transition-colors duration-300" dir="rtl">
+      <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 rounded-[3rem] p-6 md:p-10 border border-slate-100 dark:border-white/5 shadow-xl min-h-[500px]">
+        {/* Header */}
+        <div className="mb-10 text-right flex justify-between items-end">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate(-1)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+              <ChevronRight size={24} className="text-gray-600 dark:text-gray-300" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-2">{title || 'إضافة سيارة للمخزون'}</h1>
+              <p className="text-gray-500 dark:text-slate-400 font-medium">أكمل البيانات لإدراج السيارة في نظام الجرد الذكي</p>
             </div>
-        </div>
-      </div>
-
-      {/* Stepper */}
-      <div className="flex items-center justify-between mb-12 relative px-4">
-        <div className="absolute top-7 left-0 w-full h-0.5 bg-gray-100 -z-10" />
-        {['الأساسيات', 'المواصفات', 'المالية', 'الصور'].map((title, i) => (
-          <div key={i} className="flex flex-col items-center gap-3">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 border-4 ${
-              currentStep === i + 1 ? 'bg-blue-600 border-blue-100 text-white shadow-xl scale-110' :
-              completedSteps.includes(i + 1) ? 'bg-emerald-500 border-emerald-50 text-white' : 'bg-white border-gray-100 text-gray-300'
-            }`}>
-              {completedSteps.includes(i + 1) && currentStep !== i + 1 ? <CheckCircle2 size={24} /> : (i + 1)}
-            </div>
-            <span className={`text-[11px] font-bold ${currentStep === i + 1 ? 'text-blue-600' : 'text-gray-400'}`}>{title}</span>
           </div>
-        ))}
-      </div>
+          <div className="hidden md:block">
+            <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded-2xl flex items-center gap-2">
+              <div className="w-10 h-10 bg-white dark:bg-slate-700 rounded-xl flex items-center justify-center shadow-sm text-blue-600 dark:text-blue-400">
+                <Settings2 size={20} />
+              </div>
+              <span className="text-xs font-black px-2 text-gray-700 dark:text-gray-300">v2.5.0</span>
+            </div>
+          </div>
+        </div>
 
-      {/* Main Form Area */}
-      <div className="bg-gray-50/50 p-6 md:p-10 rounded-[3rem] border border-gray-100 shadow-inner min-h-[500px]">
+        {/* Stepper */}
+        <div className="flex items-center justify-between mb-12 relative px-4">
+          <div className="absolute top-7 left-0 w-full h-0.5 bg-gray-100 dark:bg-slate-800 -z-10" />
+          {['الأساسيات', 'المواصفات', 'المالية', 'الصور'].map((title, i) => (
+            <div key={i} className="flex flex-col items-center gap-3">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 border-4 ${
+                currentStep === i + 1 ? 'bg-blue-600 border-blue-100 dark:border-blue-900/50 text-white shadow-xl scale-110' :
+                completedSteps.includes(i + 1) ? 'bg-emerald-500 border-emerald-50 dark:border-emerald-950 text-white' : 
+                'bg-white dark:bg-slate-800 border-gray-100 dark:border-slate-850 text-gray-300 dark:text-slate-500'
+              }`}>
+                {completedSteps.includes(i + 1) && currentStep !== i + 1 ? <CheckCircle2 size={24} /> : (i + 1)}
+              </div>
+              <span className={`text-[11px] font-bold ${currentStep === i + 1 ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-slate-500'}`}>{title}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Main Form Area */}
+        <div className="bg-gray-50/50 dark:bg-slate-800/10 p-6 md:p-10 rounded-[3rem] border border-gray-100 dark:border-white/5 shadow-inner min-h-[500px]">
         
         {/* Step 1: Basics */}
         {currentStep === 1 && (
@@ -377,23 +386,23 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               {errors.make && <p className="text-red-500 text-xs font-bold mt-1 mr-2">{errors.make}</p>}
               
               <div className="space-y-2">
-                <label className="text-sm font-bold text-gray-600 mr-2 block text-right">الموديل</label>
+                <label className="text-sm font-bold text-gray-600 dark:text-slate-400 mr-2 block text-right">الموديل</label>
                 <input 
                   value={formData.model} 
-                onChange={(e) => setFormData({...formData, model: e.target.value})} 
-                  className={`w-full p-4 rounded-2xl border-2 ${errors.model ? 'border-red-500' : 'border-transparent'} focus:border-blue-500 focus:bg-white outline-none bg-white shadow-sm transition-all text-right`} 
+                  onChange={(e) => setFormData({...formData, model: e.target.value})} 
+                  className={`w-full p-4 rounded-2xl border-2 ${errors.model ? 'border-red-500' : 'border-transparent'} focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 outline-none bg-white dark:bg-slate-800 shadow-sm transition-all text-right text-slate-800 dark:text-white`} 
                   placeholder="مثال: Camry, Golf..." 
                 />
                 {errors.model && <p className="text-red-500 text-xs font-bold mt-1 mr-2">{errors.model}</p>}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-600 mr-2 block text-right">سنة الصنع</label>
-                  <input type="number" value={formData.year} onChange={(e) => setFormData({...formData, year: Number(e.target.value)})} className="w-full p-4 rounded-2xl bg-white shadow-sm border-none text-center font-bold" />
+                  <label className="text-sm font-bold text-gray-600 dark:text-slate-400 mr-2 block text-right">سنة الصنع</label>
+                  <input type="number" value={formData.year} onChange={(e) => setFormData({...formData, year: Number(e.target.value)})} className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 shadow-sm border-none text-center font-bold text-slate-800 dark:text-white" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-600 mr-2 block text-right">كم مقطوع (KM)</label>
-                  <input type="number" value={formData.mileage} onChange={(e) => setFormData({...formData, mileage: Number(e.target.value)})} className="w-full p-4 rounded-2xl bg-white shadow-sm border-none text-center font-bold" />
+                  <label className="text-sm font-bold text-gray-600 dark:text-slate-400 mr-2 block text-right">كم مقطوع (KM)</label>
+                  <input type="number" value={formData.mileage} onChange={(e) => setFormData({...formData, mileage: Number(e.target.value)})} className="w-full p-4 rounded-2xl bg-white dark:bg-slate-800 shadow-sm border-none text-center font-bold text-slate-800 dark:text-white" />
                 </div>
               </div>
               <AutocompleteInput 
@@ -406,11 +415,11 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               /> 
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-bold text-gray-600 mr-2 block text-right">رقم الهيكل (VIN)</label>
+              <label className="text-sm font-bold text-gray-600 dark:text-slate-400 mr-2 block text-right">رقم الهيكل (VIN)</label>
               <input // Added VIN input
                 value={formData.vin} 
                 onChange={(e) => setFormData({...formData, vin: e.target.value || undefined})} 
-                className="w-full p-4 rounded-2xl border-2 border-transparent focus:border-blue-500 focus:bg-white outline-none bg-white shadow-sm transition-all text-right" 
+                className="w-full p-4 rounded-2xl border-2 border-transparent focus:border-blue-500 focus:bg-white dark:focus:bg-slate-800 outline-none bg-white dark:bg-slate-800 shadow-sm transition-all text-right text-slate-800 dark:text-white" 
                 placeholder="أدخل رقم الهيكل الاختياري..." 
               />
             </div>
@@ -421,33 +430,33 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
         {currentStep === 2 && (
           <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4">
             <div>
-              <label className="text-md font-black text-gray-800 flex items-center gap-2 mb-6"><Info className="text-blue-500" /> حالة السيارة</label>
+              <label className="text-md font-black text-gray-800 dark:text-white flex items-center gap-2 mb-6"><Info className="text-blue-500" /> حالة السيارة</label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {CONDITIONS.map((cond) => (
-                  <button key={cond.id} onClick={() => setFormData({...formData, condition: cond.id as CarCondition})} className={`p-4 rounded-3xl flex flex-col items-center gap-3 transition-all border-4 ${formData.condition === cond.id ? 'border-blue-500 bg-white shadow-xl scale-105' : 'border-transparent bg-white/50 opacity-60'}`}>
+                  <button key={cond.id} onClick={() => setFormData({...formData, condition: cond.id as CarCondition})} className={`p-4 rounded-3xl flex flex-col items-center gap-3 transition-all border-4 ${formData.condition === cond.id ? 'border-blue-500 bg-white dark:bg-slate-800 shadow-xl scale-105' : 'border-transparent bg-white/50 dark:bg-slate-850/50 opacity-60'}`}>
                     <span className="text-3xl">{cond.icon}</span>
-                    <span className="font-black text-xs text-gray-800">{cond.label}</span>
+                    <span className="font-black text-xs text-gray-800 dark:text-slate-200">{cond.label}</span>
                     <div className={`w-full h-2 rounded-full ${cond.color}`} />
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm space-y-10">
-              <h3 className="text-lg font-black text-gray-800 border-b pb-4 flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-gray-100 dark:border-white/5 shadow-sm space-y-10">
+              <h3 className="text-lg font-black text-gray-800 dark:text-white border-b dark:border-slate-850 pb-4 flex items-center gap-2">
                 <Settings2 className="text-indigo-500" size={20} /> المواصفات التقنية
               </h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* نوع الوقود */}
                 <div className="space-y-4">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">نوع الوقود</label>
+                  <label className="text-sm font-bold text-gray-500 dark:text-slate-400 mr-2 block">نوع الوقود</label>
                   <div className="flex flex-wrap gap-2">
                     {FUEL_TYPES.map(type => (
                       <button
                         key={type}
                         onClick={() => setFormData({...formData, fuel: type as CarFormData['fuel']})}
-                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${formData.fuel === type ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                        className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${formData.fuel === type ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'}`}
                       >
                         {type === "Gasoline" ? "بنزين" : type === "Diesel" ? "ديزل" : type === "Electric" ? "كهرباء" : "هجين"}
                       </button>
@@ -457,13 +466,13 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
 
                 {/* ناقل الحركة */}
                 <div className="space-y-4">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">ناقل الحركة</label>
+                  <label className="text-sm font-bold text-gray-500 dark:text-slate-400 mr-2 block">ناقل الحركة</label>
                   <div className="flex gap-2">
                     {TRANSMISSIONS.map(type => (
                       <button
                         key={type}
                         onClick={() => setFormData({...formData, transmission: type as CarFormData['transmission']})}
-                        className={`flex-1 px-4 py-2 rounded-xl text-xs font-black transition-all ${formData.transmission === type ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                        className={`flex-1 px-4 py-2 rounded-xl text-xs font-black transition-all ${formData.transmission === type ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'}`}
                       >
                         {type === "Automatic" ? "أوتوماتيك" : "يدوي"}
                       </button>
@@ -473,13 +482,13 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
 
                 {/* نظام الدفع */}
                 <div className="space-y-4">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">نظام الدفع</label>
+                  <label className="text-sm font-bold text-gray-500 dark:text-slate-400 mr-2 block">نظام الدفع</label>
                   <div className="flex gap-2">
                     {DRIVETRAINS.map(type => (
                       <button
                         key={type}
                         onClick={() => setFormData({...formData, drivetrain: type as CarFormData['drivetrain']})}
-                        className={`flex-1 px-4 py-2 rounded-xl text-[10px] font-black transition-all ${formData.drivetrain === type ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                        className={`flex-1 px-4 py-2 rounded-xl text-[10px] font-black transition-all ${formData.drivetrain === type ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'}`}
                       >
                         {type}
                       </button>
@@ -489,10 +498,10 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
 
                 {/* الضمان */}
                 <div className="space-y-4">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">الضمان</label>
+                  <label className="text-sm font-bold text-gray-500 dark:text-slate-400 mr-2 block">الضمان</label>
                   <button
                     onClick={() => setFormData({...formData, hasWarranty: !formData.hasWarranty})}
-                    className={`w-full px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${formData.hasWarranty ? 'bg-emerald-500 text-white shadow-lg' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                    className={`w-full px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${formData.hasWarranty ? 'bg-emerald-500 text-white shadow-lg' : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-slate-400 hover:bg-gray-200 dark:hover:bg-slate-700'}`}
                   >
                     <CheckCircle2 size={16} />
                     {formData.hasWarranty ? "متوفر" : "غير متوفر"}
@@ -502,31 +511,31 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">حجم المحرك</label>
+                  <label className="text-sm font-bold text-gray-500 dark:text-slate-400 mr-2 block">حجم المحرك</label>
                   <input 
                     type="text" 
                     value={formData.engineSize || ''}
                     onChange={(e) => setFormData({...formData, engineSize: e.target.value})} 
                     placeholder="مثال: 2.0L"
-                    className="w-full p-4 rounded-2xl bg-gray-50 border-none text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                    className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-slate-800 border-none text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white" 
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-500 mr-2 block">الأسطوانات</label>
+                  <label className="text-sm font-bold text-gray-500 dark:text-slate-400 mr-2 block">الأسطوانات</label>
                   <input 
                     type="number" 
                     value={formData.cylinders} 
                     onChange={(e) => setFormData({...formData, cylinders: Number(e.target.value)})} 
-                    className="w-full p-4 rounded-2xl bg-gray-50 border-none text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500/20" 
+                    className="w-full p-4 rounded-2xl bg-gray-50 dark:bg-slate-800 border-none text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 dark:text-white" 
                   />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm space-y-8">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-[3rem] border border-gray-100 dark:border-white/5 shadow-sm space-y-8">
               <div className="flex items-center justify-between">
-                <label className="text-md font-black text-gray-800 flex items-center gap-2"><Palette className="text-pink-500" /> لون الهيكل</label>
-                <div className="flex items-center gap-2 text-xs font-black text-gray-400 bg-gray-50 px-3 py-1 rounded-full">
+                <label className="text-md font-black text-gray-800 dark:text-white flex items-center gap-2"><Palette className="text-pink-500" /> لون الهيكل</label>
+                <div className="flex items-center gap-2 text-xs font-black text-gray-400 dark:text-slate-400 bg-gray-50 dark:bg-slate-800 px-3 py-1 rounded-full">
                     <Pipette size={14} />
                     <span>اختر لوناً مخصصاً أو من القائمة</span>
                 </div>
@@ -538,7 +547,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
                   <button 
                     key={color.hex} 
                     onClick={() => { setTempColor(color.hex); setIsColorConfirmed(false); }} 
-                    className={`w-12 h-12 rounded-2xl border-4 transition-all flex items-center justify-center ${tempColor.toUpperCase() === color.hex ? 'border-blue-500 scale-110 shadow-lg' : 'border-white'}`} 
+                    className={`w-12 h-12 rounded-2xl border-4 transition-all flex items-center justify-center ${tempColor.toUpperCase() === color.hex ? 'border-blue-500 scale-110 shadow-lg' : 'border-white dark:border-slate-800'}`} 
                     style={{ backgroundColor: color.hex }}
                   >
                     {tempColor.toUpperCase() === color.hex && <CheckCircle2 className={color.text} size={20} />}
@@ -547,10 +556,10 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               </div>
 
               {/* منتقي الألوان الحر والنتيجة */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center pt-8 border-t border-gray-50">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center pt-8 border-t dark:border-slate-800 border-gray-50">
                 <div className="space-y-4">
-                    <label className="text-xs font-black text-gray-400 block">أداة اختيار اللون الحر:</label>
-                    <div className="flex items-center gap-4 bg-gray-50 p-6 rounded-[2rem] border-2 border-dashed border-gray-200 group hover:border-blue-200 transition-all">
+                    <label className="text-xs font-black text-gray-400 dark:text-slate-500 block">أداة اختيار اللون الحر:</label>
+                    <div className="flex items-center gap-4 bg-gray-50 dark:bg-slate-800/40 p-6 rounded-[2rem] border-2 border-dashed border-gray-200 dark:border-slate-700 group hover:border-blue-200 dark:hover:border-blue-500 transition-all">
                         <div className="relative w-20 h-20 shrink-0">
                             <input 
                                 type="color" 
@@ -559,33 +568,33 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                             />
                             <div 
-                                className="w-full h-full rounded-2xl shadow-xl border-4 border-white transition-transform group-hover:scale-110" 
+                                className="w-full h-full rounded-2xl shadow-xl border-4 border-white dark:border-slate-800 transition-transform group-hover:scale-110" 
                                 style={{ backgroundColor: tempColor }} 
                             />
-                            <div className="absolute -bottom-2 -right-2 bg-white p-1.5 rounded-lg shadow-md">
-                                <MousePointerClick size={14} className="text-blue-600" />
+                            <div className="absolute -bottom-2 -right-2 bg-white dark:bg-slate-700 p-1.5 rounded-lg shadow-md">
+                                <MousePointerClick size={14} className="text-blue-600 dark:text-blue-400" />
                             </div>
                         </div>
                         <div className="flex-1 space-y-1">
-                            <div className="text-sm font-black text-gray-700">اضغط على المربع للاختيار</div>
-                            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{tempColor}</div>
+                            <div className="text-sm font-black text-gray-700 dark:text-slate-200">اضغط على المربع للاختيار</div>
+                            <div className="text-[10px] text-gray-400 dark:text-slate-500 font-bold uppercase tracking-widest">{tempColor}</div>
                         </div>
                     </div>
                 </div>
 
                 <div className="space-y-4">
-                    <label className="text-xs font-black text-gray-400 block">اللون المعتمد حالياً:</label>
+                    <label className="text-xs font-black text-gray-400 dark:text-slate-500 block">اللون المعتمد حالياً:</label>
                     <div className="flex flex-col gap-4">
                        <div className="flex items-center gap-4">
-                          <div className={`w-16 h-16 rounded-[1.5rem] border-4 shadow-lg transition-all duration-500 ${isColorConfirmed ? 'border-emerald-500 scale-105' : 'border-white'}`} style={{ backgroundColor: tempColor }} />
+                          <div className={`w-16 h-16 rounded-[1.5rem] border-4 shadow-lg transition-all duration-500 ${isColorConfirmed ? 'border-emerald-500 scale-105' : 'border-white dark:border-slate-800'}`} style={{ backgroundColor: tempColor }} />
                           <div className="flex-1">
                              <input 
                                  type="text" 
                                  value={tempColor.toUpperCase()} 
                                  onChange={(e) => { setTempColor(e.target.value); setIsColorConfirmed(false); }}
-                                 className="w-full bg-transparent font-black text-2xl text-gray-800 outline-none"
+                                 className="w-full bg-transparent font-black text-2xl text-gray-800 dark:text-white outline-none"
                                  placeholder="#FFFFFF"
-                             />
+                              />
                           </div>
                        </div>
                        <button 
@@ -605,24 +614,24 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
         {currentStep === 3 && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-                <label className="text-xs font-black text-gray-400 mb-3 block">تكلفة الشراء الكلية</label>
+              <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-white/5">
+                <label className="text-xs font-black text-gray-400 dark:text-slate-400 mb-3 block">تكلفة الشراء الكلية</label>
                 <div className="flex items-center gap-3">
-                  <input type="number" value={formData.purchasePrice || ''} onChange={(e) => setFormData({...formData, purchasePrice: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent" placeholder="0" />
-                  <span className="font-black text-gray-300">دج</span>
+                  <input type="number" value={formData.purchasePrice || ''} onChange={(e) => setFormData({...formData, purchasePrice: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent text-slate-850 dark:text-white" placeholder="0" />
+                  <span className="font-black text-gray-300 dark:text-slate-500">دج</span>
                 </div>
               </div>
-              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border-2 border-blue-100 focus-within:border-blue-500 transition-all">
-                <label className="text-xs font-black text-blue-600 mb-3 block">سعر العرض للبيع</label>
+              <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] shadow-sm border-2 border-blue-100 dark:border-blue-900/50 focus-within:border-blue-500 dark:focus-within:border-blue-400 transition-all">
+                <label className="text-xs font-black text-blue-600 dark:text-blue-400 mb-3 block">سعر العرض للبيع</label>
                 <div className="flex items-center gap-3">
-                  <input type="number" value={formData.price || ''} onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent text-blue-700 focus:text-indigo-700 transition-colors" placeholder="0" />
-                  <span className="font-black text-blue-200">دج</span>
+                  <input type="number" value={formData.price || ''} onChange={(e) => setFormData({...formData, price: Number(e.target.value)})} className="w-full text-3xl font-black outline-none bg-transparent text-blue-700 dark:text-blue-400 focus:text-indigo-700 dark:focus:text-indigo-400 transition-colors" placeholder="0" />
+                  <span className="font-black text-blue-200 dark:text-blue-800">دج</span>
                 </div>
               </div>
             </div>
 
             {(formData.price > 0 && formData.purchasePrice > 0) && (
-              <div className={`p-8 rounded-[3rem] border-4 transition-all duration-500 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative ${isLoss ? 'bg-red-50 border-red-200 text-red-900 shadow-xl shadow-red-100' : 'bg-emerald-50 border-emerald-200 text-emerald-900 shadow-xl shadow-emerald-100'}`}>
+              <div className={`p-8 rounded-[3rem] border-4 transition-all duration-500 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative ${isLoss ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30 text-red-900 dark:text-red-400 shadow-xl shadow-red-100 dark:shadow-none' : 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30 text-emerald-900 dark:text-emerald-400 shadow-xl shadow-emerald-100 dark:shadow-none'}`}>
                 <div className="flex items-center gap-5 relative z-10">
                   <div className={`p-5 rounded-2xl shadow-lg ${isLoss ? 'bg-red-600' : 'bg-emerald-600'} text-white animate-bounce`}>
                     {isLoss ? <TrendingDown size={32} /> : <TrendingUp size={32} />}
@@ -656,12 +665,12 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
              <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold flex items-center gap-2 text-amber-600"><Camera/> ألبوم الصور</h2>
-                <span className="text-xs font-black bg-amber-100 text-amber-700 px-3 py-1 rounded-full">{uploadedImages.length} صور</span>
+                <span className="text-xs font-black bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 px-3 py-1 rounded-full">{uploadedImages.length} صور</span>
              </div>
              
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {uploadedImages.map((img, i) => (
-                <div key={i} className="aspect-square bg-white rounded-3xl relative flex items-center justify-center text-gray-200 border-2 border-gray-100 shadow-sm overflow-hidden group">
+                <div key={i} className="aspect-square bg-white dark:bg-slate-800 rounded-3xl relative flex items-center justify-center text-gray-200 border-2 border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden group">
                   <img src={img.url} className="w-full h-full object-cover" alt="Car" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <button onClick={() => setUploadedImages(uploadedImages.filter((_, idx) => idx !== i))} className="p-3 bg-red-500 text-white rounded-2xl shadow-xl hover:scale-110 active:scale-95 transition-all">
@@ -674,9 +683,9 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
               <button 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className="aspect-square border-4 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all group disabled:opacity-50"
+                className="aspect-square border-4 border-dashed border-gray-200 dark:border-slate-700 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 text-gray-400 dark:text-slate-500 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-850/30 transition-all group disabled:opacity-50"
               >
-                <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                <div className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-slate-800 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-slate-700 transition-colors">
                     {isUploading ? <Loader2 className="animate-spin" /> : <Plus size={24} />}
                 </div>
                 <span className="text-[10px] font-black uppercase tracking-widest">{isUploading ? 'جاري الرفع...' : 'إضافة صورة'}</span>
@@ -684,12 +693,12 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
             </div>
 
             <div className="space-y-3">
-              <label className="text-sm font-bold text-gray-600 mr-2 block text-right">ملاحظات البائع (الوصف)</label>
+              <label className="text-sm font-bold text-gray-600 dark:text-slate-400 mr-2 block text-right">ملاحظات البائع (الوصف)</label>
               <textarea 
                 value={formData.description} 
                 onChange={(e) => setFormData({...formData, description: e.target.value})} 
                 rows={4} 
-                className="w-full p-6 rounded-[2.5rem] bg-white shadow-inner outline-none border-2 border-transparent focus:border-blue-100 transition-all text-right resize-none" 
+                className="w-full p-6 rounded-[2.5rem] bg-white dark:bg-slate-800 shadow-inner outline-none border-2 border-transparent focus:border-blue-100 dark:focus:border-slate-700 focus:bg-white dark:focus:bg-slate-800 transition-all text-right resize-none text-slate-800 dark:text-white" 
                 placeholder="اذكر حالة المحرك، الدهان، أو أي إضافات أخرى..." 
               />
             </div>
@@ -702,7 +711,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
         <button 
           onClick={prevStep} 
           disabled={currentStep === 1} 
-          className={`px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-2 ${currentStep === 1 ? 'invisible' : 'bg-white text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
+          className={`px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-2 ${currentStep === 1 ? 'invisible' : 'bg-white dark:bg-slate-800 text-gray-400 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-600 dark:hover:text-slate-200'}`}
         >
           <ChevronRight size={20} />
           السابق
@@ -711,7 +720,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
         {currentStep < 4 ? (
           <button 
             onClick={nextStep} 
-            className="px-12 py-4 bg-gray-900 text-white rounded-2xl font-black shadow-xl shadow-gray-200 hover:-translate-y-1 active:scale-95 transition-all flex items-center gap-2"
+            className="px-12 py-4 bg-gray-900 dark:bg-indigo-600 text-white rounded-2xl font-black shadow-xl shadow-gray-200 dark:shadow-none hover:-translate-y-1 active:scale-95 transition-all flex items-center gap-2"
           >
             التالي
             <ChevronLeft size={20} />
@@ -719,7 +728,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
         ) : (
           <button 
             disabled={completedSteps.length < 4 || isLoading || isUploading} 
-            className={`px-14 py-4 rounded-2xl font-black transition-all shadow-xl flex items-center gap-3 ${completedSteps.length === 4 && !isUploading ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 hover:-translate-y-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed'} ${(isLoading || isUploading) ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`px-14 py-4 rounded-2xl font-black transition-all shadow-xl flex items-center gap-3 ${completedSteps.length === 4 && !isUploading ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 hover:-translate-y-1' : 'bg-gray-200 dark:bg-slate-800 text-gray-400 dark:text-slate-500 cursor-not-allowed'} ${(isLoading || isUploading) ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={() => setShowConfirmModal(true)}
           >
             {isUploading ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20}/>}
@@ -730,7 +739,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
       
       {/* Validation Message */}
       {currentStep === 4 && completedSteps.length < 4 && (
-        <div className="mt-6 flex items-center gap-2 justify-center text-amber-600 bg-amber-50 p-4 rounded-2xl border border-amber-100">
+        <div className="mt-6 flex items-center gap-2 justify-center text-amber-600 bg-amber-50 dark:bg-amber-950/20 p-4 rounded-2xl border border-amber-100 dark:border-amber-900/30">
             <AlertCircle size={18} />
             <span className="text-xs font-black">يرجى إكمال جميع الخطوات (تأكد من اختيار اللون وتأكيده وصورة واحدة على الأقل)</span>
         </div>
@@ -780,6 +789,7 @@ const AddCarForm = ({ onSubmit, isLoading, initialData, title }: AddCarFormProps
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

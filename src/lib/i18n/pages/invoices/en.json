@@ -1,0 +1,8 @@
+{
+  "page_title": "Invoice Archive",
+  "page_subtitle": "Manage and print all sales receipts",
+  "search_placeholder": "Search by invoice number or customer name...",
+  "label_customer": "Customer",
+  "label_vehicle": "Vehicle",
+  "no_results": "No invoices match your search.."
+}

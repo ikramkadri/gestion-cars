@@ -91,7 +91,7 @@ const InventoryPage = () => {
   };
 
   return (
-    <div className={`min-h-screen bg-slate-50 dark:bg-background font-sans ${isRtl ? 'text-right' : 'text-left'} transition-colors duration-300`} dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className={`min-h-screen p-4 md:p-8 bg-slate-50 dark:bg-background font-sans ${isRtl ? 'text-right' : 'text-left'} transition-colors duration-300`} dir={isRtl ? 'rtl' : 'ltr'}>
       {/* العنوان والبحث */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
         <div>

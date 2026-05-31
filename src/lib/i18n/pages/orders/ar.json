@@ -1,0 +1,22 @@
+{
+  "page_title": "طلباتي ومشترياتي",
+  "page_subtitle": "تتبع رحلة شراء سيارتك من الحجز إلى الاستلام",
+  "tab_orders": "مشترياتي وحجوزاتي",
+  "tab_favorites": "مفضلاتي ❤️",
+  "section_active_bookings": "طلبات الحجز الحالية",
+  "section_purchased_cars": "السيارات المشتراة",
+  "booking_date": "تاريخ الطلب: {date}",
+  "status_confirmed": "مقبول",
+  "status_pending": "قيد المراجعة",
+  "status_rejected": "مرفوض",
+  "no_active_bookings": "لا توجد طلبات حجز نشطة..",
+  "btn_download_invoice": "تحميل الفاتورة",
+  "btn_track_delivery": "تتبع النقل",
+  "no_purchases_yet": "ستظهر هنا فواتيرك بعد إتمام الشراء..",
+  "favorites_empty": "قائمة المفضلات فارغة",
+  "favorites_empty_desc": "ابدأ باستكشاف السيارات وأضف ما يعجبك هنا!",
+  "journey_title": "رحلتك مع MOTORIX",
+  "journey_desc": "نحن هنا لنرافقك من أول حجز حتى الصيانة الدورية. يمكنك دائماً مراجعة وثائقك وضماناتك هنا.",
+  "step_discovery": "الاكتشاف",
+  "step_ownership": "الملكية"
+}

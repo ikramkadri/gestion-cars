@@ -1,6 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  // تفعيل الدارك مود عن طريق إضافة كلاس "dark" للعنصر الأب (html)
   darkMode: ["class"],
 
   content: [

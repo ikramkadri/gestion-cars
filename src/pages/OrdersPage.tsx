@@ -24,35 +24,34 @@ const OrdersPage = () => {
   const [selectedDelivery, setSelectedDelivery] = useState<SaleWithDetails | null>(null);
   const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
 
-  // معالجة حالة التحميل لضمان عدم وجود أخطاء "undefined"
-  if (bookings === undefined || sales === undefined || favorites === undefined) {
+  // معالج�  if (bookings === undefined || sales === undefined || favorites === undefined) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FD]">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FD] dark:bg-slate-950">
+        <div className="w-12 h-12 border-4 border-indigo-600 dark:border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FD] p-8 font-sans text-right" dir="rtl">
+    <div className="min-h-screen bg-[#F8F9FD] dark:bg-slate-950 p-8 font-sans text-right transition-colors duration-300" dir="rtl">
       <div className="mb-10">
-        <h1 className="text-3xl font-black text-slate-900 flex items-center gap-3">
-          <ShoppingBag className="text-indigo-600" size={32} /> طلباتي ومشترياتي
+        <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+          <ShoppingBag className="text-indigo-600 dark:text-indigo-400" size={32} /> طلباتي ومشترياتي
         </h1>
-        <p className="text-slate-500 font-bold mt-2">تتبع رحلة شراء سيارتك من الحجز إلى الاستلام</p>
+        <p className="text-slate-500 dark:text-slate-400 font-bold mt-2">تتبع رحلة شراء سيارتك من الحجز إلى الاستلام</p>
       </div>
 
       {/* نظام التبويب (Tabs) */}
-      <div className="flex gap-4 mb-8 bg-white w-fit p-1.5 rounded-2xl border border-slate-100 shadow-sm">
+      <div className="flex gap-4 mb-8 bg-white dark:bg-slate-900 w-fit p-1.5 rounded-2xl border border-slate-100 dark:border-white/5 shadow-sm">
         <button 
           onClick={() => setActiveTab('orders')}
-          className={`px-8 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'orders' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+          className={`px-8 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'orders' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
         >
           مشترياتي وحجوزاتي
         </button>
         <button 
           onClick={() => setActiveTab('favorites')}
-          className={`px-8 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'favorites' ? 'bg-rose-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+          className={`px-8 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'favorites' ? 'bg-rose-500 text-white shadow-md' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
         >
           مفضلاتي ❤️
         </button>
@@ -63,27 +62,27 @@ const OrdersPage = () => {
         
         {/* قسم الحجوزات النشطة */}
         <div className="space-y-6">
-          <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-4">
+          <h2 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2 mb-4">
             <Clock className="text-amber-500" size={20} /> طلبات الحجز الحالية
           </h2>
           {bookings.length > 0 ? bookings.map((booking) => (
-            <div key={booking._id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center gap-4">
-              <div className="w-16 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-indigo-600">
+            <div key={booking._id} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-sm flex items-center gap-4">
+              <div className="w-16 h-12 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                 <Car size={24} />
               </div>
               <div className="flex-1">
-                <h3 className="font-black text-slate-900">{booking.carDetails?.make} {booking.carDetails?.model}</h3>
-                <p className="text-xs font-bold text-slate-400 mt-1">تاريخ الطلب: {new Date(booking.createdAt).toLocaleDateString('ar-DZ')}</p>
+                <h3 className="font-black text-slate-900 dark:text-white">{booking.carDetails?.make} {booking.carDetails?.model}</h3>
+                <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-1">تاريخ الطلب: {new Date(booking.createdAt).toLocaleDateString('ar-DZ')}</p>
               </div>
               <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                booking.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600' :
-                booking.status === 'pending' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                booking.status === 'confirmed' ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400' :
+                booking.status === 'pending' ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400' : 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-455'
               }`}>
                 {booking.status === 'confirmed' ? 'مقبول' : booking.status === 'pending' ? 'قيد المراجعة' : 'مرفوض'}
               </span>
             </div>
           )) : (
-            <div className="bg-white p-10 rounded-[2rem] border border-dashed text-center text-slate-400 font-bold italic">
+            <div className="bg-white dark:bg-slate-900 p-10 rounded-[2rem] border border-dashed border-slate-200 dark:border-slate-800 text-center text-slate-400 dark:text-slate-500 font-bold italic">
               لا توجد طلبات حجز نشطة..
             </div>
           )}
@@ -91,11 +90,11 @@ const OrdersPage = () => {
 
         {/* قسم المشتريات المكتملة */}
         <div className="space-y-6">
-          <h2 className="text-xl font-black text-slate-800 flex items-center gap-2 mb-4">
+          <h2 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2 mb-4">
             <CheckCircle2 className="text-emerald-500" size={20} /> السيارات المشتراة
           </h2>
           {sales && sales.length > 0 ? sales.map((sale) => (
-            <div key={sale._id} className="bg-slate-900 text-white p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
+            <div key={sale._id} className="bg-slate-900 dark:bg-slate-900 border border-slate-800 dark:border-white/5 text-white p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
               <div className="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
                 <FileText size={100} />
               </div>
@@ -111,7 +110,7 @@ const OrdersPage = () => {
                       setSelectedSale(sale);
                       setIsInvoiceOpen(true);
                     }}
-                    className="flex items-center gap-2 text-xs font-black text-indigo-400 hover:text-indigo-300 transition-colors"
+                    className="flex items-center gap-2 text-xs font-black text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
                   >
                     <FileText size={14} /> تحميل الفاتورة
                   </button>
@@ -120,7 +119,7 @@ const OrdersPage = () => {
                       setSelectedDelivery(sale);
                       setIsDeliveryOpen(true);
                     }}
-                    className="flex items-center gap-2 text-xs font-black text-emerald-400 hover:text-emerald-300 transition-colors"
+                    className="flex items-center gap-2 text-xs font-black text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
                   >
                     <ArrowLeftRight size={14} /> تتبع النقل
                   </button>
@@ -128,7 +127,7 @@ const OrdersPage = () => {
               </div>
             </div>
           )) : (
-            <div className="bg-white p-10 rounded-[2rem] border border-dashed text-center text-slate-400 font-bold italic">
+            <div className="bg-white dark:bg-slate-900 p-10 rounded-[2rem] border border-dashed border-slate-200 dark:border-slate-800 text-center text-slate-400 dark:text-slate-500 font-bold italic">
               ستظهر هنا فواتيرك بعد إتمام الشراء..
             </div>
           )}
@@ -146,10 +145,10 @@ const OrdersPage = () => {
               />
             ))
           ) : (
-            <div className="col-span-full py-24 bg-white rounded-[3rem] border border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
-              <Heart className="text-rose-200 mb-4" size={48} />
-              <h2 className="text-xl font-black text-slate-400">قائمة المفضلات فارغة</h2>
-              <p className="text-slate-300 font-bold mt-2">ابدأ باستكشاف السيارات وأضف ما يعجبك هنا!</p>
+            <div className="col-span-full py-24 bg-white dark:bg-slate-900 rounded-[3rem] border border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center">
+              <Heart className="text-rose-200 dark:text-rose-900/40 mb-4" size={48} />
+              <h2 className="text-xl font-black text-slate-400 dark:text-slate-500">قائمة المفضلات فارغة</h2>
+              <p className="text-slate-300 dark:text-slate-600 font-bold mt-2">ابدأ باستكشاف السيارات وأضف ما يعجبك هنا!</p>
             </div>
           )}
         </div>
@@ -169,6 +168,23 @@ const OrdersPage = () => {
            <div className="w-10 h-[2px] bg-white/20 mt-5" />
            <div className="flex flex-col items-center gap-2">
               <div className="w-10 h-10 rounded-full bg-white text-indigo-600 flex items-center justify-center font-black">2</div>
+              <span className="text-[10px] font-black">الملكية</span>
+           </div>
+        </div>
+      </div>
+
+      <InvoiceClassic 
+        isOpen={isInvoiceOpen} 
+        onClose={() => setIsInvoiceOpen(false)} 
+        sale={selectedSale} 
+      />
+
+      <DeliveryTrackerModal 
+        isOpen={isDeliveryOpen} 
+        onClose={() => setIsDeliveryOpen(false)} 
+        sale={selectedDelivery} 
+      />
+    </div>l bg-white text-indigo-600 flex items-center justify-center font-black">2</div>
               <span className="text-[10px] font-black">الملكية</span>
            </div>
         </div>

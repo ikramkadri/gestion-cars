@@ -1,0 +1,17 @@
+{
+  "mark_all_read_success": "تم تحديد الكل كمقروء",
+  "mark_all_read_error": "فشل في تحديث التنبيهات",
+  "delete_success": "تم حذف التنبيه",
+  "delete_error": "فقط المسؤول يمكنه حذف التنبيهات",
+  "new_notifications": "{count} تنبيهات جديدة",
+  "page_title": "مركز الإشعارات",
+  "page_title_highlight": "الإشعارات",
+  "page_desc": "سجل كامل للنشاطات، الحجوزات، وتحديثات النظام في MOTORIX.",
+  "mark_all_read": "تحديد الكل كمقروء",
+  "filter_all": "الكل",
+  "filter_bookings": "حجوزات",
+  "filter_updates": "تحديثات",
+  "filter_success": "نجاح",
+  "filter_warnings": "تنبيهات",
+  "priority_high": "هام جداً"
+}

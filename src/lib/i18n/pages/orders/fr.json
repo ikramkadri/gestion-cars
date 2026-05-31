@@ -1,0 +1,22 @@
+{
+  "page_title": "Mes commandes et achats",
+  "page_subtitle": "Suivez votre parcours d'achat de la réservation à la livraison",
+  "tab_orders": "Mes achats et réservations",
+  "tab_favorites": "Mes favoris ❤️",
+  "section_active_bookings": "Réservations actives",
+  "section_purchased_cars": "Voitures achetées",
+  "booking_date": "Date : {date}",
+  "status_confirmed": "Confirmé",
+  "status_pending": "En cours",
+  "status_rejected": "Refusé",
+  "no_active_bookings": "Aucune réservation active..",
+  "btn_download_invoice": "Télécharger la facture",
+  "btn_track_delivery": "Suivre la livraison",
+  "no_purchases_yet": "Vos factures apparaîtront ici après l'achat..",
+  "favorites_empty": "Liste de favoris vide",
+  "favorites_empty_desc": "Commencez à explorer les voitures et ajoutez vos préférées !",
+  "journey_title": "Votre parcours MOTORIX",
+  "journey_desc": "Nous vous accompagnons de la première réservation à l'entretien régulier.",
+  "step_discovery": "Découverte",
+  "step_ownership": "Propriété"
+}

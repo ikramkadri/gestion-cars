@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
 import AddCarForm, { CarFormData } from "../components/AddCarForm";
-import { Loader2, ArrowRight } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 export default function EditCarPage() {
@@ -48,27 +48,21 @@ export default function EditCarPage() {
   if (car === null) return <div className="p-10 text-center">السيارة غير موجودة.</div>;
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-600 hover:text-blue-600 mb-6 transition-colors">
-        <ArrowRight size={20} />
-        <span>العودة للمخزن</span>
-      </button>
-      <AddCarForm
-        title={`تعديل: ${car.make} ${car.model}`}
-        initialData={{
-          ...car,
-          mainImageUrl: car.mainImageUrl ?? null,
-          mainImage: car.mainImage || undefined,
-          images: car.images || [], // Ensure images is Id<"_storage">[]
-          description: car.description ?? "",
-          vin: car.vin ?? "",
-          origin: car.origin ?? "",
-          engineSize: car.engineSize ?? "",
-          color: car.color ?? "",
-        }}
-        onSubmit={handleSubmit}
-        isLoading={isSubmitting}
-      />
-    </div>
+    <AddCarForm
+      title={`تعديل: ${car.make} ${car.model}`}
+      initialData={{
+        ...car,
+        mainImageUrl: car.mainImageUrl ?? null,
+        mainImage: car.mainImage || undefined,
+        images: car.images || [], // Ensure images is Id<"_storage">[]
+        description: car.description ?? "",
+        vin: car.vin ?? "",
+        origin: car.origin ?? "",
+        engineSize: car.engineSize ?? "",
+        color: car.color ?? "",
+      }}
+      onSubmit={handleSubmit}
+      isLoading={isSubmitting}
+    />
   );
 }

@@ -1,0 +1,22 @@
+{
+  "page_title": "My Orders & Purchases",
+  "page_subtitle": "Track your car purchase journey from booking to delivery",
+  "tab_orders": "My Orders & Bookings",
+  "tab_favorites": "My Favorites ❤️",
+  "section_active_bookings": "Active Bookings",
+  "section_purchased_cars": "Purchased Cars",
+  "booking_date": "Order Date: {date}",
+  "status_confirmed": "Confirmed",
+  "status_pending": "Under Review",
+  "status_rejected": "Rejected",
+  "no_active_bookings": "No active booking requests..",
+  "btn_download_invoice": "Download Invoice",
+  "btn_track_delivery": "Track Delivery",
+  "no_purchases_yet": "Your invoices will appear here after purchase..",
+  "favorites_empty": "Favorites list is empty",
+  "favorites_empty_desc": "Start exploring cars and add your favorites here!",
+  "journey_title": "Your Journey with MOTORIX",
+  "journey_desc": "We are here with you from your first booking to regular maintenance. Review your documents and warranties anytime.",
+  "step_discovery": "Discovery",
+  "step_ownership": "Ownership"
+}

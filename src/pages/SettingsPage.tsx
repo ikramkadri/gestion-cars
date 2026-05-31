@@ -138,7 +138,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 text-right" dir="rtl">
+    <div className="min-h-screen p-4 md:p-8 bg-[#F8F9FD] dark:bg-slate-950 space-y-6 animate-in fade-in duration-500 text-right" dir="rtl">
       
       {/* قسم هوية المعرض (للأدمن فقط) */}
       {user?.role === 'admin' && (

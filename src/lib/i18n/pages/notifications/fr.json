@@ -1,0 +1,17 @@
+{
+  "mark_all_read_success": "Tout marquer comme lu",
+  "mark_all_read_error": "Échec de la mise à jour des notifications",
+  "delete_success": "Notification supprimée",
+  "delete_error": "Seuls les admins peuvent supprimer",
+  "new_notifications": "{count} Nouvelles notifications",
+  "page_title": "Centre de notifications",
+  "page_title_highlight": "Notifications",
+  "page_desc": "Registre complet des activités, réservations et mises à jour.",
+  "mark_all_read": "Tout marquer comme lu",
+  "filter_all": "Tout",
+  "filter_bookings": "Réservations",
+  "filter_updates": "Mises à jour",
+  "filter_success": "Succès",
+  "filter_warnings": "Alertes",
+  "priority_high": "Haute priorité"
+}
