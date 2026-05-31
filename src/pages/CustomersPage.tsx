@@ -10,6 +10,10 @@ import {
 import { toast } from 'react-hot-toast';
 import { Doc, Id } from '../../convex/_generated/dataModel';
 import { motion, AnimatePresence } from 'framer-motion';
+import { usePageTranslation } from '../lib/i18n/usePageTranslation';
+import ar from '../lib/i18n/pages/customers/ar.json';
+import en from '../lib/i18n/pages/customers/en.json';
+import fr from '../lib/i18n/pages/customers/fr.json';
 
 interface StatCard {
   name: string;
@@ -40,6 +44,7 @@ const CustomersPage = () => {
     status: 'خالص',
     totalPurchases: 0
   });
+  const { t } = usePageTranslation({ ar, en, fr });
 
   // Queries
   const currentUser = useQuery(api.users.viewer, { token });
@@ -84,10 +89,10 @@ const CustomersPage = () => {
     const totalPurchasesSum = customers.reduce((sum, c) => sum + (c.totalPurchases || 0), 0);
 
     return [
-      { name: 'إجمالي الزبائن', value: total, icon: <Users className="text-violet-600 dark:text-violet-400" />, bg: 'bg-violet-50 dark:bg-violet-950/40', border: 'border-violet-100 dark:border-violet-900/50', pulse: false },
-      { name: 'زبائن خالصين', value: paid, icon: <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" />, bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-100 dark:border-emerald-900/50', pulse: false },
-      { name: 'زبائن بالدين', value: debt, icon: <AlertCircle className="text-rose-600 dark:text-rose-400" />, bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-100 dark:border-rose-900/50', pulse: false },
-      { name: 'حجم مشتريات الزبائن', value: `${totalPurchasesSum.toLocaleString()} دج`, icon: <DollarSign className="text-amber-600 dark:text-amber-400" />, bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-100 dark:border-amber-900/50', pulse: false },
+      { name: t('stats_total_customers'), value: total, icon: <Users className="text-violet-600 dark:text-violet-400" />, bg: 'bg-violet-50 dark:bg-violet-950/40', border: 'border-violet-100 dark:border-violet-900/50', pulse: false },
+      { name: t('stats_paid'), value: paid, icon: <CheckCircle2 className="text-emerald-600 dark:text-emerald-400" />, bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-100 dark:border-emerald-900/50', pulse: false },
+      { name: t('stats_debt'), value: debt, icon: <AlertCircle className="text-rose-600 dark:text-rose-400" />, bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-100 dark:border-rose-900/50', pulse: false },
+      { name: t('stats_purchase_volume'), value: `${totalPurchasesSum.toLocaleString()} دج`, icon: <DollarSign className="text-amber-600 dark:text-amber-400" />, bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-100 dark:border-amber-900/50', pulse: false },
     ];
   }, [customers]);
 
@@ -99,10 +104,10 @@ const CustomersPage = () => {
     const pending = users.filter(u => u.status === 'pending').length;
 
     return [
-      { name: 'إجمالي المستخدمين', value: total, icon: <Users className="text-indigo-600 dark:text-indigo-400" />, bg: 'bg-indigo-50 dark:bg-indigo-950/40', border: 'border-indigo-100 dark:border-indigo-900/50', pulse: false },
-      { name: 'المدراء (Admins)', value: adminsCount, icon: <Shield className="text-amber-600 dark:text-amber-400" />, bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-100 dark:border-amber-900/50', pulse: false },
-      { name: 'فريق المبيعات', value: salesCount, icon: <Briefcase className="text-emerald-600 dark:text-emerald-400" />, bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-100 dark:border-emerald-900/50', pulse: false },
-      { name: 'طلبات في الانتظار', value: pending, icon: <BadgeAlert className="text-rose-600 dark:text-rose-400" />, bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-100 dark:border-rose-900/50', pulse: pending > 0 },
+      { name: t('stats_total_users'), value: total, icon: <Users className="text-indigo-600 dark:text-indigo-400" />, bg: 'bg-indigo-50 dark:bg-indigo-950/40', border: 'border-indigo-100 dark:border-indigo-900/50', pulse: false },
+      { name: t('stats_admins'), value: adminsCount, icon: <Shield className="text-amber-600 dark:text-amber-400" />, bg: 'bg-amber-50 dark:bg-amber-950/40', border: 'border-amber-100 dark:border-amber-900/50', pulse: false },
+      { name: t('stats_sales_team'), value: salesCount, icon: <Briefcase className="text-emerald-600 dark:text-emerald-400" />, bg: 'bg-emerald-50 dark:bg-emerald-950/40', border: 'border-emerald-100 dark:border-emerald-900/50', pulse: false },
+      { name: t('stats_pending_reqs'), value: pending, icon: <BadgeAlert className="text-rose-600 dark:text-rose-400" />, bg: 'bg-rose-50 dark:bg-rose-950/40', border: 'border-rose-100 dark:border-rose-900/50', pulse: pending > 0 },
     ];
   }, [users]);
 
@@ -112,12 +117,12 @@ const CustomersPage = () => {
 
   // Handlers for Customers
   const handleDeleteCustomer = async (id: Id<"customers">, name: string) => {
-    if (!window.confirm(`هل أنت متأكد من حذف الزبون "${name}"؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
+    if (!window.confirm(t('delete_customer_confirm').replace('{name}', name))) return;
     try {
       await removeCustomer({ token, customerId: id });
-      toast.success("تم حذف الزبون بنجاح");
+      toast.success(t('delete_customer_success'));
     } catch {
-      toast.error("فشل الحذف، للأدمن فقط هذه الصلاحية");
+      toast.error(t('delete_customer_error'));
     }
   };
 
@@ -138,10 +143,10 @@ const CustomersPage = () => {
         status: editingCustomer.status,
         totalPurchases: editingCustomer.totalPurchases
       });
-      toast.success("تم تحديث بيانات الزبون بنجاح");
+      toast.success(t('edit_customer_success'));
       setEditingCustomer(null);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "فشل تحديث البيانات");
+      toast.error(error instanceof Error ? error.message : t('edit_customer_error'));
     } finally {
       setIsSubmitting(false);
     }
@@ -150,7 +155,7 @@ const CustomersPage = () => {
   const handleAddCustomerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCustomerData.fullName.trim() || !newCustomerData.phone.trim()) {
-      return toast.error("الاسم الكامل ورقم الهاتف حقول مطلوبة");
+      return toast.error(t('form_required_fields'));
     }
 
     setIsSubmitting(true);
@@ -165,7 +170,7 @@ const CustomersPage = () => {
         status: newCustomerData.status,
         totalPurchases: newCustomerData.totalPurchases
       });
-      toast.success("تم إضافة الزبون الجديد بنجاح");
+      toast.success(t('add_customer_success'));
       setIsAddModalOpen(false);
       setNewCustomerData({
         fullName: '',
@@ -177,7 +182,7 @@ const CustomersPage = () => {
         totalPurchases: 0
       });
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "فشل إضافة الزبون");
+      toast.error(error instanceof Error ? error.message : t('add_customer_error'));
     } finally {
       setIsSubmitting(false);
     }
@@ -187,28 +192,28 @@ const CustomersPage = () => {
   const handleApproveUser = async (userId: Id<"users">, name: string) => {
     try {
       await approveUser({ token, userId });
-      toast.success(`تم قبول وتفعيل حساب المستخدم "${name}" بنجاح! 🎉`);
+      toast.success(t('approve_user_success').replace('{name}', name));
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "فشل تفعيل الحساب.");
+      toast.error(error instanceof Error ? error.message : t('approve_user_error'));
     }
   };
 
   const handleRoleChange = async (userId: Id<"users">, newRole: "admin" | "sales_manager" | "viewer") => {
     try {
       await updateRole({ token, userId, role: newRole });
-      toast.success("تم تحديث رتبة المستخدم بنجاح");
+      toast.success(t('update_role_success'));
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء التحديث.");
+      toast.error(error instanceof Error ? error.message : t('update_role_error'));
     }
   };
 
   const handleDeleteUser = async (userId: Id<"users">, name: string) => {
-    if (!window.confirm(`هل أنت متأكد من حذف حساب المستخدم "${name}"؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
+    if (!window.confirm(t('delete_user_account_confirm').replace('{name}', name))) return;
     try {
       await removeUser({ token, userId });
-      toast.success("تم حذف حساب المستخدم بنجاح");
+      toast.success(t('delete_account_success'));
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء الحذف");
+      toast.error(error instanceof Error ? error.message : t('delete_user_error'));
     }
   };
 
@@ -228,12 +233,12 @@ const CustomersPage = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-            {activeTab === 'customers' ? 'إدارة الزبائن' : 'قبول وإدارة المستخدمين'}
+            {activeTab === 'customers' ? t('page_title_customers') : t('page_title_users')}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 font-bold mt-1 text-sm md:text-base">
             {activeTab === 'customers' 
-              ? 'قاعدة البيانات الموحدة للعملاء والمبيعات في Motorix' 
-              : 'التحكم في تفعيل صلاحيات المستخدمين الجدد وتعديل الرتب'}
+              ? t('page_desc_customers')
+              : t('page_desc_users')}
           </p>
         </div>
 
@@ -244,7 +249,7 @@ const CustomersPage = () => {
             className="flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-sm transition-all shadow-lg shadow-indigo-200 dark:shadow-none hover:scale-[1.02] active:scale-95 cursor-pointer"
           >
             <UserPlus size={16} />
-            <span>إضافة زبون جديد</span>
+            <span>{t('add_customer')}</span>
           </button>
         )}
       </div>
@@ -280,7 +285,7 @@ const CustomersPage = () => {
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
             }`}
           >
-            الزبائن والعملاء
+            {t('tab_customers')}
           </button>
           {isAdmin && (
             <button
@@ -291,7 +296,7 @@ const CustomersPage = () => {
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
-              <span>المستخدمين والقبول</span>
+              <span>{t('tab_users')}</span>
               {pendingUsersCount > 0 && (
                 <span className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
               )}
@@ -304,7 +309,7 @@ const CustomersPage = () => {
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
           <input 
             type="text" 
-            placeholder={activeTab === 'customers' ? 'ابحث باسم الزبون، الهاتف، أو رقم الهوية...' : 'ابحث بالاسم، البريد أو الهاتف...'}
+            placeholder={activeTab === 'customers' ? t('search_placeholder_customers') : t('search_placeholder_users')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pr-12 pl-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold text-sm shadow-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:text-white transition-all"
@@ -318,12 +323,12 @@ const CustomersPage = () => {
             <table className="w-full text-right min-w-[800px]">
               <thead>
                 <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
-                  <th className="px-8 py-4">الزبون</th>
-                  <th className="px-8 py-4">معلومات الاتصال</th>
-                  <th className="px-8 py-4">رقم التعريف الوطنية</th>
-                  <th className="px-8 py-4">إجمالي المشتريات</th>
-                  <th className="px-8 py-4">الحالة المادية</th>
-                  <th className="px-8 py-4 text-center">الإجراءات</th>
+                  <th className="px-8 py-4">{t('th_customer')}</th>
+                  <th className="px-8 py-4">{t('th_contact')}</th>
+                  <th className="px-8 py-4">{t('th_identity')}</th>
+                  <th className="px-8 py-4">{t('th_purchases')}</th>
+                  <th className="px-8 py-4">{t('th_status')}</th>
+                  <th className="px-8 py-4 text-center">{t('th_actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -344,7 +349,7 @@ const CustomersPage = () => {
                             <Phone size={14} className="text-slate-300 dark:text-slate-600" /> {customer.phone}
                           </div>
                           <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 font-bold">
-                            <MapPin size={12} className="text-slate-300 dark:text-slate-600" /> {customer.address || "غير محدد"}
+                            <MapPin size={12} className="text-slate-300 dark:text-slate-600" /> {customer.address || t('not_specified')}
                           </div>
                         </div>
                       </td>
@@ -376,7 +381,7 @@ const CustomersPage = () => {
                           <button 
                             onClick={() => setEditingCustomer(customer)}
                             className="p-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-500 dark:hover:text-white transition-all cursor-pointer"
-                            title="تعديل بيانات الزبون"
+                            title={t('title_edit')}
                           >
                             <Edit3 size={16}/>
                           </button>
@@ -395,7 +400,7 @@ const CustomersPage = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="p-20 text-center text-slate-400 dark:text-slate-500 font-bold">لا يوجد زبائن يطابقون بحثك..</td>
+                    <td colSpan={6} className="p-20 text-center text-slate-400 dark:text-slate-500 font-bold">{t('no_customers')}</td>
                   </tr>
                 )}
               </tbody>
@@ -405,12 +410,12 @@ const CustomersPage = () => {
             <table className="w-full text-right min-w-[800px]">
               <thead>
                 <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 dark:border-slate-800">
-                  <th className="px-8 py-4">المستخدم</th>
-                  <th className="px-8 py-4">البريد الإلكتروني / الاتصال</th>
-                  <th className="px-8 py-4">الرتبة / الصلاحية في النظام</th>
-                  <th className="px-8 py-4">حالة الحساب</th>
-                  <th className="px-8 py-4">آخر دخول للمنصة</th>
-                  <th className="px-8 py-4 text-center">الإجراءات والقبول</th>
+                  <th className="px-8 py-4">{t('th_user')}</th>
+                  <th className="px-8 py-4">{t('th_email')}</th>
+                  <th className="px-8 py-4">{t('th_role')}</th>
+                  <th className="px-8 py-4">{t('th_account_status')}</th>
+                  <th className="px-8 py-4">{t('th_last_login')}</th>
+                  <th className="px-8 py-4 text-center">{t('th_actions_users')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
@@ -455,9 +460,9 @@ const CustomersPage = () => {
                                 : 'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700/50'}
                           `}
                         >
-                          <option value="viewer">مشاهد (Viewer)</option>
-                          <option value="sales_manager">مدير مبيعات (Sales)</option>
-                          <option value="admin">مدير نظام (Admin)</option>
+                          <option value="viewer">{t('role_viewer')}</option>
+                          <option value="sales_manager">{t('role_sales')}</option>
+                          <option value="admin">{t('role_admin')}</option>
                         </select>
                       </td>
                       <td className="px-8 py-5">
@@ -471,13 +476,13 @@ const CustomersPage = () => {
                           <span className={`w-1.5 h-1.5 rounded-full ${
                             user.status === 'active' ? 'bg-emerald-500' : user.status === 'pending' ? 'bg-amber-500' : 'bg-rose-500'
                           }`} />
-                          {user.status === 'active' ? 'نشط ومفعل' : user.status === 'pending' ? 'بانتظار التفعيل' : 'محظور'}
+                          {user.status === 'active' ? t('status_active') : user.status === 'pending' ? t('status_pending_activation') : t('status_banned')}
                         </span>
                       </td>
                       <td className="px-8 py-5">
                         <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 text-xs font-bold">
                           <Calendar size={14} className="text-slate-300 dark:text-slate-600" />
-                          {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('ar-DZ') : 'لم يدخل بعد'}
+                          {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('ar-DZ') : t('not_login_yet')}
                         </div>
                       </td>
                       <td className="px-8 py-5 text-center">
@@ -486,16 +491,16 @@ const CustomersPage = () => {
                             <button 
                               onClick={() => handleApproveUser(user._id, user.fullName)}
                               className="px-3 py-1.5 text-xs font-black text-emerald-600 bg-emerald-50 hover:bg-emerald-600 hover:text-white dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500 dark:hover:text-white rounded-xl transition-all flex items-center gap-1 cursor-pointer shadow-sm hover:shadow active:scale-95"
-                              title="قبول وتفعيل حساب المستخدم"
+                              title={t('activate_account_title')}
                             >
                               <CheckCircle size={14} />
-                              <span>قبول وتفعيل</span>
+                              <span>{t('btn_activate')}</span>
                             </button>
                           )}
                           <button 
                             onClick={() => handleDeleteUser(user._id, user.fullName)}
                             className="p-2 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition-all cursor-pointer md:opacity-0 group-hover:opacity-100"
-                            title="حذف حساب المستخدم نهائياً"
+                            title={t('delete_user_title')}
                           >
                             <UserMinus size={16} />
                           </button>
@@ -506,7 +511,7 @@ const CustomersPage = () => {
                 ) : (
                   <tr>
                     <td colSpan={6} className="p-20 text-center text-slate-400 dark:text-slate-500 font-bold">
-                      لا توجد نتائج تطابق بحثك..
+                      {t('no_results')}
                     </td>
                   </tr>
                 )}
@@ -549,9 +554,9 @@ const CustomersPage = () => {
               <div className="mb-6">
                 <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <Edit3 className="text-indigo-600 dark:text-indigo-400" size={24} />
-                  <span>تعديل بيانات الزبون</span>
+                  <span>{t('edit_customer_title')}</span>
                 </h3>
-                <p className="text-slate-500 dark:text-slate-400 text-xs font-bold mt-1">تحديث الحقول والبيانات المالية الحالية للزبون</p>
+                <p className="text-slate-500 dark:text-slate-400 text-xs font-bold mt-1">{t('edit_customer_desc')}</p>
               </div>
 
               <form onSubmit={handleEditCustomerSubmit} className="space-y-4">
@@ -559,7 +564,7 @@ const CustomersPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* الاسم الكامل */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">الاسم الكامل للزبون *</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_name_label')}</label>
                     <input 
                       required
                       type="text" 
@@ -571,7 +576,7 @@ const CustomersPage = () => {
 
                   {/* رقم الهاتف */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">رقم الهاتف *</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_phone_label')}</label>
                     <input 
                       required
                       type="text" 
@@ -585,7 +590,7 @@ const CustomersPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* البريد الإلكتروني */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">البريد الإلكتروني (اختياري)</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_email_label')}</label>
                     <input 
                       type="email" 
                       value={editingCustomer.email || ''}
@@ -596,7 +601,7 @@ const CustomersPage = () => {
 
                   {/* رقم الهوية الوطنية */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">رقم الهوية الوطنية NIN (اختياري)</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_identity_label')}</label>
                     <input 
                       type="text" 
                       value={editingCustomer.identityNum || ''}
@@ -608,7 +613,7 @@ const CustomersPage = () => {
 
                 {/* العنوان */}
                 <div>
-                  <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">عنوان السكن (اختياري)</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_address_label')}</label>
                   <input 
                     type="text" 
                     value={editingCustomer.address || ''}
@@ -620,7 +625,7 @@ const CustomersPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* إجمالي المشتريات */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">إجمالي المشتريات (دج)</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_purchases_label')}</label>
                     <input 
                       type="number" 
                       value={editingCustomer.totalPurchases || 0}
@@ -631,14 +636,14 @@ const CustomersPage = () => {
 
                   {/* الحالة المادية */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">الحالة المادية للزبون</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_status_label')}</label>
                     <select
                       value={editingCustomer.status}
                       onChange={(e) => setEditingCustomer({ ...editingCustomer, status: e.target.value })}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200/55 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                     >
-                      <option value="خالص">خالص (خالي من الديون)</option>
-                      <option value="دين">دين (مسجل عليه ديون)</option>
+                      <option value="خالص">{t('status_paid_desc')}</option>
+                      <option value="دين">{t('status_debt_desc')}</option>
                     </select>
                   </div>
                 </div>
@@ -649,7 +654,7 @@ const CustomersPage = () => {
                     onClick={() => setEditingCustomer(null)}
                     className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer"
                   >
-                    إلغاء
+                    {t('btn_cancel')}
                   </button>
                   <button 
                     disabled={isSubmitting}
@@ -657,7 +662,7 @@ const CustomersPage = () => {
                     className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black transition-all cursor-pointer shadow shadow-indigo-200 dark:shadow-none hover:scale-[1.01] active:scale-95"
                   >
                     {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                    <span>حفظ التعديلات</span>
+                    <span>{t('btn_save')}</span>
                   </button>
                 </div>
               </form>
@@ -697,9 +702,9 @@ const CustomersPage = () => {
               <div className="mb-6">
                 <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2">
                   <UserPlus className="text-indigo-600 dark:text-indigo-400" size={24} />
-                  <span>إضافة زبون جديد</span>
+                  <span>{t('add_customer_title')}</span>
                 </h3>
-                <p className="text-slate-500 dark:text-slate-400 text-xs font-bold mt-1">تسجيل ملف زبون جديد في النظام يدوياً</p>
+                <p className="text-slate-500 dark:text-slate-400 text-xs font-bold mt-1">{t('add_customer_desc')}</p>
               </div>
 
               <form onSubmit={handleAddCustomerSubmit} className="space-y-4">
@@ -707,7 +712,7 @@ const CustomersPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* الاسم الكامل */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">الاسم الكامل للزبون *</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_name_label')}</label>
                     <input 
                       required
                       type="text" 
@@ -720,7 +725,7 @@ const CustomersPage = () => {
 
                   {/* رقم الهاتف */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">رقم الهاتف *</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_phone_label')}</label>
                     <input 
                       required
                       type="text" 
@@ -735,7 +740,7 @@ const CustomersPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* البريد الإلكتروني */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">البريد الإلكتروني (اختياري)</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_email_label')}</label>
                     <input 
                       type="email" 
                       placeholder="customer@example.com"
@@ -747,7 +752,7 @@ const CustomersPage = () => {
 
                   {/* رقم الهوية الوطنية */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">رقم الهوية الوطنية NIN (اختياري)</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_identity_label')}</label>
                     <input 
                       type="text" 
                       placeholder="123456789012"
@@ -760,7 +765,7 @@ const CustomersPage = () => {
 
                 {/* العنوان */}
                 <div>
-                  <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">عنوان السكن (اختياري)</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_address_label')}</label>
                   <input 
                     type="text" 
                     placeholder="حي 5 جويلية، الجزائر العاصمة"
@@ -773,7 +778,7 @@ const CustomersPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* إجمالي المشتريات */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">إجمالي المشتريات (دج)</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_purchases_label')}</label>
                     <input 
                       type="number" 
                       value={newCustomerData.totalPurchases}
@@ -784,14 +789,14 @@ const CustomersPage = () => {
 
                   {/* الحالة المادية */}
                   <div>
-                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">الحالة المادية للزبون</label>
+                    <label className="block text-xs font-black text-slate-400 dark:text-slate-500 mb-2">{t('form_status_label')}</label>
                     <select
                       value={newCustomerData.status}
                       onChange={(e) => setNewCustomerData({ ...newCustomerData, status: e.target.value })}
                       className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200/55 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
                     >
-                      <option value="خالص">خالص (خالي من الديون)</option>
-                      <option value="دين">دين (مسجل عليه ديون)</option>
+                      <option value="خالص">{t('status_paid_desc')}</option>
+                      <option value="دين">{t('status_debt_desc')}</option>
                     </select>
                   </div>
                 </div>
@@ -802,7 +807,7 @@ const CustomersPage = () => {
                     onClick={() => setIsAddModalOpen(false)}
                     className="px-5 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer"
                   >
-                    إلغاء
+                    {t('btn_cancel')}
                   </button>
                   <button 
                     disabled={isSubmitting}
@@ -810,7 +815,7 @@ const CustomersPage = () => {
                     className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-black transition-all cursor-pointer shadow shadow-indigo-200 dark:shadow-none hover:scale-[1.01] active:scale-95"
                   >
                     {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-                    <span>إضافة الزبون</span>
+                    <span>{t('btn_add')}</span>
                   </button>
                 </div>
               </form>

@@ -4,11 +4,16 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { toast } from 'react-hot-toast';
 import { Id } from '../../convex/_generated/dataModel';
+import { usePageTranslation } from '../lib/i18n/usePageTranslation';
+import ar from '../lib/i18n/pages/archived-inventory/ar.json';
+import en from '../lib/i18n/pages/archived-inventory/en.json';
+import fr from '../lib/i18n/pages/archived-inventory/fr.json';
 
 const ArchivedInventoryPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const cars = useQuery(api.cars.getCars, { includeArchived: true });
   const updateCar = useMutation(api.cars.updateCar);
+  const { t } = usePageTranslation({ ar, en, fr });
 
   const filteredCars = cars?.filter(car => 
     car.make.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -23,9 +28,9 @@ const ArchivedInventoryPage = () => {
         carId: id,
         updates: { isArchived: false, status: "Available" }
       });
-      toast.success("تمت استعادة السيارة للمخزون النشط ✅");
+      toast.success(t('restore_success'));
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "فشل في استعادة السيارة");
+      toast.error(error instanceof Error ? error.message : t('restore_error'));
     }
   };
 
@@ -33,16 +38,16 @@ const ArchivedInventoryPage = () => {
     <div className="min-h-screen bg-[#F8F9FD] dark:bg-slate-950 p-8 font-sans text-right transition-colors duration-300" dir="rtl">
       <div className="mb-10">
         <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-          <Archive className="text-slate-400 dark:text-slate-500" size={32} /> أرشيف المركبات
+          <Archive className="text-slate-400 dark:text-slate-500" size={32} /> {t('page_title')}
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 font-bold italic">جميع السيارات المباعة أو التي تم أرشفتها من المخزون النشط</p>
+        <p className="text-slate-500 dark:text-slate-400 font-bold italic">{t('page_subtitle')}</p>
       </div>
 
       <div className="relative max-w-md mb-12">
         <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
         <input 
           type="text" 
-          placeholder="ابحث في الأرشيف عن سيارة، رقم شاصي..."
+          placeholder={t('search_placeholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pr-12 pl-4 py-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 text-slate-800 dark:text-white rounded-2xl font-bold shadow-sm outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-505 transition-all"
@@ -58,10 +63,10 @@ const ArchivedInventoryPage = () => {
           <table className="w-full text-right">
             <thead>
               <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest">
-                <th className="px-8 py-4">المركبة</th>
-                <th className="px-8 py-4 text-right">السعر النهائي</th>
-                <th className="px-8 py-4 text-right">الحالة</th>
-                <th className="px-8 py-4 text-center">الإجراءات</th>
+                <th className="px-8 py-4">{t('th_vehicle')}</th>
+                <th className="px-8 py-4 text-right">{t('th_price')}</th>
+                <th className="px-8 py-4 text-right">{t('th_status')}</th>
+                <th className="px-8 py-4 text-center">{t('th_actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-850">
@@ -80,7 +85,7 @@ const ArchivedInventoryPage = () => {
                   </td>
                   <td className="px-8 py-5 text-right">
                     <span className={`px-3 py-1 rounded-lg text-[10px] font-black ${car.status === "Sold" ? 'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700'}`}>
-                      {car.status === "Sold" ? "مباعة" : "مؤرشفة"}
+                      {car.status === "Sold" ? t('status_sold') : t('status_archived')}
                     </span>
                   </td>
                   <td className="px-8 py-5">
@@ -88,7 +93,7 @@ const ArchivedInventoryPage = () => {
                       <button 
                         onClick={() => handleRestore(car._id)}
                         className="p-2 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-500 transition-all shadow-sm cursor-pointer"
-                        title="استعادة السيارة للمخزون"
+                        title={t('restore_title')}
                       >
                         <RotateCcw size={16}/>
                       </button>
@@ -104,9 +109,9 @@ const ArchivedInventoryPage = () => {
           <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 text-slate-200 dark:text-slate-700">
             <Car size={40} />
           </div>
-          <h2 className="text-xl font-black text-slate-400 dark:text-slate-500">الأرشيف فارغ حالياً</h2>
+          <h2 className="text-xl font-black text-slate-400 dark:text-slate-500">{t('empty_title')}</h2>
           <p className="text-slate-300 dark:text-slate-650 font-bold mt-2 text-sm text-center max-w-xs">
-            السيارات التي ستقوم بنقلها للأرشيف ستظهر هنا لإدارة سجلاتها التاريخية.
+            {t('empty_desc')}
           </p>
         </div>
       )}

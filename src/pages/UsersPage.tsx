@@ -7,10 +7,16 @@ import {
 } from 'lucide-react'; // Removed unused imports
 import { toast } from 'react-hot-toast';
 import { Id, Doc } from '../../convex/_generated/dataModel';
+import { usePageTranslation } from '../lib/i18n/usePageTranslation';
+import ar from '../lib/i18n/pages/users/ar.json';
+import en from '../lib/i18n/pages/users/en.json';
+import fr from '../lib/i18n/pages/users/fr.json';
 
 const UsersPage = () => {
   const token = localStorage.getItem("convex_token") || "";
   const [searchTerm, setSearchTerm] = useState("");
+
+  const { t } = usePageTranslation({ ar, en, fr });
 
   // جلب قائمة المستخدمين من Convex (للأدمن فقط حسب القواعد التي وضعناها)
   const users = useQuery(api.users.listUsers, { token }) as Doc<"users">[] | undefined;
@@ -29,10 +35,10 @@ const UsersPage = () => {
   const stats = useMemo(() => {
     if (!users) return [];
     return [
-      { name: 'إجمالي المستخدمين', value: users?.length || 0, icon: <Users className="text-indigo-600" />, bg: 'bg-indigo-50' },
-      { name: 'المسؤولين (Admins)', value: users?.filter(u => u.role === 'admin').length || 0, icon: <Shield className="text-amber-600" />, bg: 'bg-amber-50' },
-      { name: 'فريق المبيعات', value: users?.filter(u => u.role === 'sales_manager').length || 0, icon: <UserCheck className="text-emerald-600" />, bg: 'bg-emerald-50' },
-      { name: 'المشاهدين', value: users?.filter(u => u.role === 'viewer').length || 0, icon: <ShieldAlert className="text-slate-600" />, bg: 'bg-slate-50' },
+      { name: t('stats_total'), value: users?.length || 0, icon: <Users className="text-indigo-600" />, bg: 'bg-indigo-50' },
+      { name: t('stats_admins'), value: users?.filter(u => u.role === 'admin').length || 0, icon: <Shield className="text-amber-600" />, bg: 'bg-amber-50' },
+      { name: t('stats_sales'), value: users?.filter(u => u.role === 'sales_manager').length || 0, icon: <UserCheck className="text-emerald-600" />, bg: 'bg-emerald-50' },
+      { name: t('stats_viewers'), value: users?.filter(u => u.role === 'viewer').length || 0, icon: <ShieldAlert className="text-slate-600" />, bg: 'bg-slate-50' },
     ];
   }, [users]);
 
@@ -40,15 +46,15 @@ const UsersPage = () => {
   const handleRoleChange = async (userId: Id<"users">, newRole: "admin" | "sales_manager" | "viewer") => {
     try {
       await updateRole({ token, userId, role: newRole });
-      toast.success("تم تحديث رتبة المستخدم بنجاح");
+      toast.success(t('role_update_success'));
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء التحديث.");
+      toast.error(error instanceof Error ? error.message : t('role_update_error'));
     }
   };
 
   // حذف مستخدم مع تأكيد
   const handleDeleteUser = async (userId: Id<"users">, name: string) => {
-    if (!window.confirm(`هل أنت متأكد من حذف المستخدم "${name}"؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
+    if (!window.confirm(t('delete_confirm').replace('{name}', name))) return;
 
     // Handle loading state for users
     if (users === undefined || users === null) {
@@ -60,9 +66,9 @@ const UsersPage = () => {
     }
     try {
       await removeUser({ token, userId });
-      toast.success("تم حذف المستخدم بنجاح");
+      toast.success(t('delete_success'));
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "حدث خطأ أثناء الحذف");
+      toast.error(error instanceof Error ? error.message : t('delete_error'));
     }
   };
 
@@ -78,8 +84,8 @@ const UsersPage = () => {
     <div className="min-h-screen bg-[#F8F9FD] dark:bg-slate-950 p-8 font-sans transition-colors duration-300" dir="rtl">
       {/* العنوان */}
       <div className="mb-10 text-right">
-        <h1 className="text-3xl font-black text-slate-900 dark:text-white">إدارة فريق العمل</h1>
-        <p className="text-slate-500 dark:text-slate-400 font-bold italic">تحكم في صلاحيات المستخدمين والوصول للنظام</p>
+        <h1 className="text-3xl font-black text-slate-900 dark:text-white">{t('page_title')}</h1>
+        <p className="text-slate-500 dark:text-slate-400 font-bold italic">{t('page_subtitle')}</p>
       </div>
 
       {/* بطاقات الإحصائيات */}
@@ -101,7 +107,7 @@ const UsersPage = () => {
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
           <input 
             type="text" 
-            placeholder="ابحث بالاسم أو البريد الإلكتروني..."
+            placeholder={t('search_placeholder')}
             className="w-full pr-12 pl-4 py-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 text-slate-850 dark:text-white rounded-2xl font-bold text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 outline-none transition-all shadow-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -115,12 +121,12 @@ const UsersPage = () => {
           <table className="w-full text-right">
             <thead>
               <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest">
-                <th className="px-8 py-4">المستخدم</th>
-                <th className="px-8 py-4">البريد الإلكتروني</th>
-                <th className="px-8 py-4">الرتبة / الصلاحية</th>
-                <th className="px-8 py-4">حالة الدخول</th>
-                <th className="px-8 py-4">آخر دخول</th>
-                <th className="px-8 py-4 text-center">الإجراءات</th>
+                <th className="px-8 py-4">{t('th_user')}</th>
+                <th className="px-8 py-4">{t('th_email')}</th>
+                <th className="px-8 py-4">{t('th_role')}</th>
+                <th className="px-8 py-4">{t('th_status')}</th>
+                <th className="px-8 py-4">{t('th_last_login')}</th>
+                <th className="px-8 py-4 text-center">{t('th_actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-850">
@@ -154,9 +160,9 @@ const UsersPage = () => {
                           'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 ring-slate-200 dark:ring-slate-700'}
                       `}
                     >
-                      <option value="viewer">مشاهد (Viewer)</option>
-                      <option value="sales_manager">مدير مبيعات (Sales)</option>
-                      <option value="admin">مدير نظام (Admin)</option>
+                      <option value="viewer">{t('role_viewer')}</option>
+                      <option value="sales_manager">{t('role_sales')}</option>
+                      <option value="admin">{t('role_admin')}</option>
                     </select>
                   </td>
                   <td className="px-8 py-5">
@@ -165,13 +171,13 @@ const UsersPage = () => {
                       user.status === 'pending' ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 animate-pulse' : 
                       'bg-rose-50 dark:bg-rose-950/20 text-rose-600 dark:text-rose-455'
                     }`}>
-                      {user.status === 'active' ? 'نشط' : user.status === 'pending' ? 'قيد الانتظار' : 'محظور'}
+                      {user.status === 'active' ? t('status_active') : user.status === 'pending' ? t('status_pending') : t('status_banned')}
                     </span>
                   </td>
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-2 text-slate-400 dark:text-slate-500 text-xs font-bold">
                       <Calendar size={14} className="text-slate-300 dark:text-slate-650" />
-                      {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('ar-DZ') : 'لم يدخل بعد'}
+                      {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString('ar-DZ') : t('not_login')}
                     </div>
                   </td>
                   <td className="px-8 py-5 text-center">
@@ -180,7 +186,7 @@ const UsersPage = () => {
                         <button 
                           onClick={() => approveUser({ token, userId: user._id })}
                           className="p-2 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer rounded-xl"
-                          title="تفعيل الحساب"
+                          title={t('activate_title')}
                         >
                           <CheckCircle size={18} />
                         </button>
@@ -198,7 +204,7 @@ const UsersPage = () => {
               )) : (
                 <tr>
                   <td colSpan={6} className="p-20 text-center text-slate-400 dark:text-slate-650 font-bold">
-                    لا توجد نتائج تطابق بحثك..
+                    {t('no_results')}
                   </td>
                 </tr>
               )}

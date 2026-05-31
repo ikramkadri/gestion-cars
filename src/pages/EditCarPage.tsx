@@ -6,11 +6,16 @@ import { Id } from "../../convex/_generated/dataModel";
 import AddCarForm, { CarFormData } from "../components/AddCarForm";
 import { Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { usePageTranslation } from '../lib/i18n/usePageTranslation';
+import ar from '../lib/i18n/pages/edit-car/ar.json';
+import en from '../lib/i18n/pages/edit-car/en.json';
+import fr from '../lib/i18n/pages/edit-car/fr.json';
 
 export default function EditCarPage() {
   const { carId } = useParams();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { t } = usePageTranslation({ ar, en, fr });
 
   const car = useQuery(api.cars.getCarById, { carId: carId as Id<"cars"> });
   const updateCar = useMutation(api.cars.updateCar);
@@ -19,18 +24,17 @@ export default function EditCarPage() {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem("convex_token") || "";
-      
-      // إرسال التحديثات فقط (يمكن تنظيف الأوبجكت من الحقول غير القابلة للتعديل إذا لزم الأمر)
+
       await updateCar({
         token,
         carId: carId as Id<"cars">,
-        updates: { ...formData, mainImage: formData.mainImage || undefined, images: formData.images || undefined }, // Pass undefined for null/empty optional fields
+        updates: { ...formData, mainImage: formData.mainImage || undefined, images: formData.images || undefined },
       });
 
-      toast.success("تم تحديث بيانات السيارة بنجاح");
+      toast.success(t('update_success'));
       navigate("/admin/inventory");
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "حدث خطأ أثناء التحديث";
+      const errorMessage = error instanceof Error ? error.message : t('update_error');
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -45,16 +49,16 @@ export default function EditCarPage() {
     );
   }
 
-  if (car === null) return <div className="p-10 text-center">السيارة غير موجودة.</div>;
+  if (car === null) return <div className="p-10 text-center">{t('car_not_found')}</div>;
 
   return (
     <AddCarForm
-      title={`تعديل: ${car.make} ${car.model}`}
+      title={t('page_title').replace('{make}', car.make).replace('{model}', car.model)}
       initialData={{
         ...car,
         mainImageUrl: car.mainImageUrl ?? null,
         mainImage: car.mainImage || undefined,
-        images: car.images || [], // Ensure images is Id<"_storage">[]
+        images: car.images || [],
         description: car.description ?? "",
         vin: car.vin ?? "",
         origin: car.origin ?? "",

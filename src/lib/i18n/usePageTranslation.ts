@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useLanguage } from '../LanguageContext';
-import { createPageT, type PageTranslationSet, type Language } from './index';
+import { createPageT, type PageTranslationSet } from './index';
 
 /**
  * Hook that merges page-specific JSON translations on top of the shared

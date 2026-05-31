@@ -6,10 +6,13 @@ import { api } from '../../convex/_generated/api';
 import Sidebar from '../components/Sidebar';
 import LoadingScreen from '../components/LoadingScreen';
 import { Menu, X } from 'lucide-react';
-import { useLanguage } from '../lib/LanguageContext';
+import { usePageTranslation } from '../lib/i18n/usePageTranslation';
+import ar from '../lib/i18n/pages/admin-layout/ar.json';
+import en from '../lib/i18n/pages/admin-layout/en.json';
+import fr from '../lib/i18n/pages/admin-layout/fr.json';
 const AdminLayout = ({ children }: { children?: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { isRtl } = useLanguage();
+  const { t, isRtl } = usePageTranslation({ ar, en, fr });
   const token = localStorage.getItem("convex_token") ?? undefined;
   const user = useQuery(api.users.viewer, token ? { token } : "skip");
   const customSignOut = useMutation(api.auth.signOut);
@@ -21,7 +24,7 @@ const AdminLayout = ({ children }: { children?: React.ReactNode }) => {
   const handleSignOut = async () => {
     if (token) await customSignOut({ token });
     localStorage.removeItem("convex_token");
-    toast.success("تم تسجيل الخروج بنجاح!");
+    toast.success(t('sign_out_success'));
     window.location.href = "/";
   }
 

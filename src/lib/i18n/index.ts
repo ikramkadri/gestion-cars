@@ -21,13 +21,18 @@ export type PageTranslationSet = Record<Language, Record<string, string>>;
  * Returns the key itself as a fallback if neither base nor page has it.
  */
 export function createPageT(
-  baseT: (key: string) => string,
+  baseT: (key: string, options?: Record<string, string | number>) => string,
   pageTranslations: PageTranslationSet,
   language: Language,
-): (key: string) => string {
+): (key: string, options?: Record<string, string | number>) => string {
   const langData = pageTranslations[language] ?? {};
-  return (key: string) => {
-    if (key in langData) return langData[key];
-    return baseT(key);
+  return (key: string, options?: Record<string, string | number>) => {
+    let result = key in langData ? langData[key] : baseT(key, options);
+    if (options) {
+      Object.entries(options).forEach(([k, v]) => {
+        result = result.replace(`{${k}}`, String(v));
+      });
+    }
+    return result;
   };
 }

@@ -4,6 +4,10 @@ import { TrendingUp, BarChart3, ArrowUpRight, Loader2, Users, Clock, Target, Awa
 import DashboardChart from '../components/DashboardChart';
 import StatsCard from '../components/StatsCard';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { usePageTranslation } from '../lib/i18n/usePageTranslation';
+import ar from '../lib/i18n/pages/statistics/ar.json';
+import en from '../lib/i18n/pages/statistics/en.json';
+import fr from '../lib/i18n/pages/statistics/fr.json';
 
 interface BrandStat {
   name: string;
@@ -24,6 +28,7 @@ interface SourceStat {
 const StatisticsPage = () => {
   const token = localStorage.getItem("convex_token") || "";
   const stats = useQuery(api.statistics.getDashboardStats, { token });
+  const { t } = usePageTranslation({ ar, en, fr });
 
   if (!stats) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8F9FD] dark:bg-slate-950">
@@ -39,14 +44,14 @@ const StatisticsPage = () => {
     <div className="min-h-screen bg-[#F8F9FD] dark:bg-slate-950 p-8 font-sans text-right transition-colors duration-300" dir="rtl">
       <div className="mb-10">
         <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-3">
-          <BarChart3 className="text-rose-500" size={32} /> إحصائيات الأرباح والنمو
+          <BarChart3 className="text-rose-500" size={32} /> {t('page_title')}
         </h1>
-        <p className="text-slate-500 dark:text-slate-400 font-bold italic">التحليل المالي الدقيق لأداء معرض Motorix</p>
+        <p className="text-slate-500 dark:text-slate-400 font-bold italic">{t('page_subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-10">
         <StatsCard 
-          label="صافي الربح الحقيقي"
+          label={t('net_profit')}
           val={stats.financials.totalProfit}
           unit="دج"
           icon={TrendingUp}
@@ -54,15 +59,15 @@ const StatisticsPage = () => {
           bg="bg-emerald-50 dark:bg-emerald-950/20"
         />
         <StatsCard 
-          label="متوسط وقت البيع"
+          label={t('avg_sale_time')}
           val={stats.inventory.averageDaysToSell}
-          unit="يوم"
+          unit={t('days')}
           icon={Clock}
           color="text-indigo-600 dark:text-indigo-400"
           bg="bg-indigo-50 dark:bg-indigo-950/20"
         />
         <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-sm flex flex-col justify-between">
-          <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2"><Target size={14} className="text-rose-500"/> معدل التحويل (CRO)</p>
+          <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2"><Target size={14} className="text-rose-500"/> {t('conversion_rate')}</p>
           <div className="flex items-end justify-between">
             <h4 className="text-4xl font-black text-slate-900 dark:text-white">{stats.financials.conversionRate}%</h4>
             <div className="flex items-center text-emerald-500 dark:text-emerald-400 font-black text-xs bg-emerald-50 dark:bg-emerald-950/20 px-2 py-1 rounded-lg">
@@ -81,7 +86,7 @@ const StatisticsPage = () => {
         </div>
         
         <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-sm">
-          <h3 className="font-black text-slate-800 dark:text-white text-lg mb-6 flex items-center gap-2">توزيع الماركات المباعة</h3>
+          <h3 className="font-black text-slate-800 dark:text-white text-lg mb-6 flex items-center gap-2">{t('brand_distribution')}</h3>
           <div className="h-64 w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
               <PieChart>
@@ -104,7 +109,7 @@ const StatisticsPage = () => {
           {/* الرسم البياني الجديد لمصادر المبيعات */}
           <div className="mt-10 pt-10 border-t dark:border-slate-800">
             <h3 className="font-black text-slate-800 dark:text-white text-sm mb-6 flex items-center gap-2">
-              <MousePointer2 size={18} className="text-blue-500" /> من أين يأتي المشترون؟
+              <MousePointer2 size={18} className="text-blue-500" /> {t('sales_sources')}
             </h3>
             <div className="h-48 w-full min-w-0">
               <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={50}>
@@ -130,7 +135,7 @@ const StatisticsPage = () => {
           <div className="mt-6 space-y-4">
             <div className="flex items-center justify-between mb-4 border-t dark:border-slate-800 pt-6">
                <h3 className="font-black text-slate-800 dark:text-white text-sm flex items-center gap-2">
-                 <Award size={18} className="text-amber-500" /> ترتيب فريق المبيعات
+                 <Award size={18} className="text-amber-500" /> {t('sales_leaderboard')}
                </h3>
                <Users size={16} className="text-slate-300 dark:text-slate-650" />
             </div>
@@ -143,7 +148,7 @@ const StatisticsPage = () => {
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400">{(seller.total || 0).toLocaleString()} دج</p>
-                  <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500">{seller.count} عمليات بيع</p>
+                  <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500">{t('sales_count').replace('{count}', String(seller.count))}</p>
                 </div>
               </div>
             )) : (

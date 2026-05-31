@@ -8,7 +8,10 @@ import { SaleWithDetails } from '../types/app';
 import DashboardChart from '../components/DashboardChart';
 import { Doc } from '../../convex/_generated/dataModel';
 import StatsCard from '../components/StatsCard';
-import { useLanguage } from '../lib/LanguageContext';
+import ar from '../lib/i18n/pages/dashboard/ar.json';
+import en from '../lib/i18n/pages/dashboard/en.json';
+import fr from '../lib/i18n/pages/dashboard/fr.json';
+import { usePageTranslation } from '../lib/i18n/usePageTranslation';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -93,7 +96,7 @@ const EmptyState = ({
 const Dashboard = () => {
   const token = localStorage.getItem("convex_token") ?? undefined;
   const navigate = useNavigate();
-  const { t, language, isRtl } = useLanguage();
+  const { t, language, isRtl } = usePageTranslation({ ar, en, fr });
   const user = useQuery(api.users.viewer, { token });
   const stats = useQuery(api.statistics.getDashboardStats, { token: token || undefined });
   const recentSales = useQuery(api.sales.getRecentSales, { token: token || undefined, limit: 5 });
@@ -183,7 +186,7 @@ const Dashboard = () => {
               bg="bg-amber-500"
               label={t('dashboard_stock_value')} 
               val={(stats.financials.stockValue / 1000000).toFixed(1)}
-              unit={language === 'ar' ? 'مليون د.ج' : 'M DZD'}
+              unit={t('dzd_million')}
             />
           </motion.div>
         )}

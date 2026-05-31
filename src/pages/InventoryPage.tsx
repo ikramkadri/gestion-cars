@@ -22,17 +22,20 @@ import StatsCard from '../components/StatsCard'; // استيراد مكون بط
 import SaleFormModal from '../components/SaleFormModal';
 import Confetti from 'react-confetti'; // استيراد مكون القصاصات
 import { useWindowSize } from 'react-use'; // استيراد هوك لمعرفة أبعاد النافذة
-import { useLang } from '../lib/LanguageContext';
+import ar from '../lib/i18n/pages/inventory/ar.json';
+import en from '../lib/i18n/pages/inventory/en.json';
+import fr from '../lib/i18n/pages/inventory/fr.json';
+import { usePageTranslation } from '../lib/i18n/usePageTranslation';
 const InventoryPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [carConditionFilter, setCarConditionFilter] = useState<"All" | "New" | "Used">("All");
-  const { t, language, isRtl } = useLang();
+  const { t, isRtl } = usePageTranslation({ ar, en, fr });
   const statusLabels = {
-    ar: { available: "متاح للبيع", reserved: "محجوزة حالياً", sold: "تم البيع" },
-    fr: { available: "Disponible", reserved: "Réservé", sold: "Vendu" },
-    en: { available: "Available", reserved: "Reserved", sold: "Sold" }
+    available: t('status_available'),
+    reserved: t('status_reserved'),
+    sold: t('status_sold')
   };
-  const sl = statusLabels[language as 'ar' | 'fr' | 'en'] || statusLabels.ar;
+  const sl = statusLabels;
   const navigate = useNavigate();
   
   const token = localStorage.getItem("convex_token") ?? undefined;
@@ -174,7 +177,7 @@ const InventoryPage = () => {
           color="text-white"
           label={t('inventory_total_stock_value')} 
           val={stats ? (stats.financials.stockValue / 1000000).toFixed(1) : "..."} 
-          unit={language === 'ar' ? 'مليون د.ج' : 'M DZD'}
+          unit={t('dzd_million')}
         />
         <StatsCard 
           icon={Clock} 

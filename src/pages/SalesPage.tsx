@@ -7,11 +7,16 @@ import { Plus, Search, Archive, RotateCcw, Printer, Edit3, Wallet, Users, Target
 import { toast } from 'react-hot-toast';
 import InvoiceClassic from '../components/InvoiceClassic'; 
 import SaleFormModal from '../components/SaleFormModal';
+import { usePageTranslation } from '../lib/i18n/usePageTranslation';
+import ar from '../lib/i18n/pages/sales/ar.json';
+import en from '../lib/i18n/pages/sales/en.json';
+import fr from '../lib/i18n/pages/sales/fr.json';
 
 const SalesPage = () => {
   const token = localStorage.getItem("convex_token") || "";
   const [currentTab, setCurrentTab] = useState("active");
   const [searchTerm, setSearchTerm] = useState("");
+  const { t } = usePageTranslation({ ar, en, fr });
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<SaleWithDetails | null>(null);
@@ -35,9 +40,9 @@ const SalesPage = () => {
   ) => {
     try {
       await updateDelivery({ token, saleId, status });
-      toast.success("تم تحديث حالة النقل بنجاح 🚚");
+      toast.success(t('update_delivery_success'));
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "فشل التحديث");
+      toast.error(error instanceof Error ? error.message : t('update_delivery_error'));
     }
   };
 
@@ -48,10 +53,10 @@ const SalesPage = () => {
     const totalProfit = salesData.reduce((acc: number, curr: SaleWithDetails) => acc + (curr.profit || 0), 0);
     
     return [
-      { name: 'إجمالي المداخيل', value: `${total.toLocaleString()} دج`, icon: <Wallet className="text-blue-600" />, bg: 'bg-blue-50' },
-      { name: 'صافي الأرباح', value: `${totalProfit.toLocaleString()} دج`, icon: <TrendingUp className="text-emerald-600" />, bg: 'bg-emerald-50' },
-      { name: 'الزبائن', value: new Set(salesData.map((s: SaleWithDetails) => s.customerName)).size, icon: <Users className="text-purple-600" />, bg: 'bg-purple-50' },
-      { name: 'كفاءة البيع', value: '94%', icon: <Target className="text-amber-600" />, bg: 'bg-amber-50' }
+      { name: t('stats_total_revenue'), value: `${total.toLocaleString()} دج`, icon: <Wallet className="text-blue-600" />, bg: 'bg-blue-50' },
+      { name: t('stats_net_profit'), value: `${totalProfit.toLocaleString()} دج`, icon: <TrendingUp className="text-emerald-600" />, bg: 'bg-emerald-50' },
+      { name: t('stats_customers'), value: new Set(salesData.map((s: SaleWithDetails) => s.customerName)).size, icon: <Users className="text-purple-600" />, bg: 'bg-purple-50' },
+      { name: t('stats_efficiency'), value: '94%', icon: <Target className="text-amber-600" />, bg: 'bg-amber-50' }
     ];
   }, [salesData]);
 
@@ -60,14 +65,14 @@ const SalesPage = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-10">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 dark:text-white">إدارة المبيعات</h1>
-          <p className="text-slate-500 dark:text-slate-400 font-bold italic">Motorix Adrar - نظام الفوترة المتطور</p>
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white">{t('page_title')}</h1>
+          <p className="text-slate-500 dark:text-slate-400 font-bold italic">{t('page_subtitle')}</p>
         </div>
         <button 
           onClick={() => setIsSaleModalOpen(true)}
           className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-2xl flex items-center gap-3 font-black shadow-lg shadow-indigo-200 dark:shadow-none transition-all cursor-pointer"
         >
-          <Plus size={20} /> إضافة عملية بيع
+          <Plus size={20} /> {t('add_sale')}
         </button>
       </div>
 
@@ -90,7 +95,7 @@ const SalesPage = () => {
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
           <input 
             type="text" 
-            placeholder="ابحث عن زبون، سيارة أو رقم فاتورة..."
+            placeholder={t('search_placeholder')}
             className="w-full pr-12 pl-4 py-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-white/5 text-slate-800 dark:text-white rounded-2xl font-bold text-sm focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 outline-none transition-all shadow-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -102,13 +107,13 @@ const SalesPage = () => {
             onClick={() => setCurrentTab("active")} 
             className={`px-8 py-2.5 rounded-xl text-xs font-black transition-all ${currentTab === "active" ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 dark:text-slate-550 hover:text-slate-600 dark:hover:text-slate-300'}`}
           >
-            العمليات النشطة
+            {t('tab_active')}
           </button>
           <button 
             onClick={() => setCurrentTab("archived")} 
             className={`px-8 py-2.5 rounded-xl text-xs font-black transition-all ${currentTab === "archived" ? 'bg-amber-500 text-white shadow-md' : 'text-slate-400 dark:text-slate-550 hover:text-slate-600 dark:hover:text-slate-300'}`}
           >
-            الأرشيف
+            {t('tab_archived')}
           </button>
         </div>
       </div>
@@ -119,14 +124,14 @@ const SalesPage = () => {
           <table className="w-full text-right">
             <thead>
               <tr className="bg-slate-50/50 dark:bg-slate-800/30 text-slate-400 dark:text-slate-500 text-[10px] font-black uppercase tracking-widest">
-                <th className="px-8 py-4">رقم الفاتورة</th>
-                <th className="px-8 py-4">المركبة</th>
-                <th className="px-8 py-4">الزبون</th>
-                <th className="px-8 py-4">التاريخ</th>
-                <th className="px-8 py-4">طريقة الدفع</th>
-                <th className="px-8 py-4">حالة التتبع</th>
-                <th className="px-8 py-4">المبلغ</th>
-                <th className="px-8 py-4 text-center">الإجراءات</th>
+                <th className="px-8 py-4">{t('th_invoice')}</th>
+                <th className="px-8 py-4">{t('th_vehicle')}</th>
+                <th className="px-8 py-4">{t('th_customer')}</th>
+                <th className="px-8 py-4">{t('th_date')}</th>
+                <th className="px-8 py-4">{t('th_payment')}</th>
+                <th className="px-8 py-4">{t('th_delivery')}</th>
+                <th className="px-8 py-4">{t('th_amount')}</th>
+                <th className="px-8 py-4 text-center">{t('th_actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-850">
@@ -157,14 +162,14 @@ const SalesPage = () => {
                       )}
                       className="bg-slate-50 dark:bg-slate-800 border-none text-[10px] font-black rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 cursor-pointer text-slate-600 dark:text-slate-300"
                     >
-                      <option value="processed">تجهيز الوثائق</option>
-                      <option value="quality_check">فحص الجودة</option>
-                      <option value="shipped">في الطريق</option>
-                      <option value="delivered">تم التسليم</option>
+                      <option value="processed">{t('delivery_processed')}</option>
+                      <option value="quality_check">{t('delivery_quality')}</option>
+                      <option value="shipped">{t('delivery_shipped')}</option>
+                      <option value="delivered">{t('delivery_delivered')}</option>
                     </select>
                     <div className="mt-1 flex items-center gap-1 opacity-40 dark:opacity-60">
                        <Truck size={10} className="text-slate-500 dark:text-slate-400" />
-                       <span className="text-[8px] font-bold text-slate-500 dark:text-slate-400">تتبع حي</span>
+                       <span className="text-[8px] font-bold text-slate-500 dark:text-slate-400">{t('delivery_tracking')}</span>
                     </div>
                   </td>
                   <td className="px-8 py-5 font-black text-slate-900 dark:text-white tabular-nums">
@@ -192,7 +197,7 @@ const SalesPage = () => {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={8} className="p-20 text-center text-slate-400 dark:text-slate-600 font-bold">لا توجد نتائج تطابق بحثك..</td>
+                  <td colSpan={8} className="p-20 text-center text-slate-400 dark:text-slate-600 font-bold">{t('no_results')}</td>
                 </tr>
               )}
             </tbody>

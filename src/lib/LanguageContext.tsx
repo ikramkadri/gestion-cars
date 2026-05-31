@@ -9,7 +9,7 @@ interface LanguageContextType {
   setLang: (l: Language) => void;
   theme: Theme;
   toggleTheme: () => void;
-  t: (key: string) => string;
+  t: (key: string, options?: Record<string, string | number>) => string;
   isRtl: boolean;
 }
 
@@ -779,10 +779,16 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const isRtl = language === 'ar';
 
-  const t = (key: string) => {
+  const t = (key: string, options?: Record<string, string | number>) => {
     const langData = translations[language];
     const value = langData[key as keyof TranslationMessages];
-    return typeof value === 'string' ? value : key;
+    let result = typeof value === 'string' ? value : key;
+    if (options) {
+      Object.entries(options).forEach(([k, v]) => {
+        result = result.replace(`{${k}}`, String(v));
+      });
+    }
+    return result;
   };
 
   const setLang = (l: Language) => setLanguage(l);
